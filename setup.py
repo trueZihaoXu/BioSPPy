@@ -23,10 +23,10 @@ from setuptools import find_packages, setup, Command
 # Package meta-data.
 NAME = 'biosppy'
 DESCRIPTION = 'A toolbox for biosignal processing written in Python.'
-URL = 'https://github.com/PIA-Group/BioSPPy'
-EMAIL = 'carlos.carreiras@lx.it.pt'
+URL = 'https://github.com/scientisst/BioSPPy'
+EMAIL = 'developer@scientisst.com'
 AUTHOR = 'Instituto de Telecomunicacoes'
-REQUIRES_PYTHON = '>=2.7.10'
+REQUIRES_PYTHON = '>3.5.2'
 VERSION = None
 LICENSE = 'BSD 3-clause'
 
@@ -141,8 +141,6 @@ setup(
         'Natural Language :: English',
         'License :: OSI Approved :: BSD License',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
