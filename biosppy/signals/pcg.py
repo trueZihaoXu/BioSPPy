@@ -16,9 +16,12 @@ from __future__ import absolute_import, division, print_function
 # 3rd party
 import numpy as np
 import scipy.signal as ss
+import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 
 # local
 from . import tools as st
+from . import ecg
 from .. import plotting, utils
 
 
@@ -74,7 +77,7 @@ def pcg(signal=None, sampling_rate=1000., path=None, show=True):
     filtered,fs,params = st.filter_signal(signal,'butter','bandpass',order,passBand,sampling_rate)
 
     # find peaks
-    peaks,envelope = find_peaks(signal=filtered, sampling_rate=sampling_rate)
+    peaks,envelope = find_peaks(signal=signal, sampling_rate=sampling_rate)
     
     # classify heart sounds
     hs, = identify_heart_sounds(beats=peaks, sampling_rate=sampling_rate)
@@ -144,9 +147,13 @@ def find_peaks(signal=None,sampling_rate=1000.):
     return utils.ReturnTuple((peaks,envelope), 
                              ('peaks','homomorphic_envelope'))
 
-def homomorphic_filter(signal=None, sampling_rate=1000.):
+def homomorphic_filter(signal=None, sampling_rate=1000., f_LPF=8, order=1):
     
-    """Finds the homomorphic envelope of a signal
+    """Finds the homomorphic envelope of a signal.
+
+    Adapted to Python from original MATLAB code written by David Springer, 2016 (C), for
+    comparison purposes in the paper [Springer15]_.
+    Available at: https://github.com/davidspringer/Springer-Segmentation-Code
 
     Follows the approach described by Schmidt et al. [Schimdt10]_.
 
@@ -156,6 +163,10 @@ def homomorphic_filter(signal=None, sampling_rate=1000.):
         Input filtered PCG signal.
     sampling_rate : int, float, optional
         Sampling frequency (Hz).
+    f_LPF: int, float, optional
+        Low pass cut-off frequency (Hz)
+    order: int, optional
+        Order of Butterworth low pass filter.
 
     Returns
     -------
@@ -164,6 +175,8 @@ def homomorphic_filter(signal=None, sampling_rate=1000.):
 
     References
     ----------
+    .. [Springer15] D.Springer, "Logistic Regression-HSMM-based Heart Sound Segmentation",
+       IEEE Trans. Biomed. Eng., In Press, 2015.
     .. [Schimdt10] S. E. Schmidt et al., "Segmentation of heart sound recordings by a 
        duration-dependent hidden Markov model", Physiol. Meas., 2010
 
@@ -174,11 +187,21 @@ def homomorphic_filter(signal=None, sampling_rate=1000.):
         raise TypeError("Please specify an input signal.")
 
     sampling_rate = float(sampling_rate)
-        
+    f_LPF = float(f_LPF)
+    
+    # Filter Design
+    order = 2
+    passBand = np.array([25, 400])
+    
+    # Band-Pass filtering of the PCG:        
+    signal,fs,params = st.filter_signal(signal,'butter','bandpass',order,passBand,sampling_rate)
+    
     # LP-filter Design (to reject the oscillating component of the signal):
-    order = 1; fc = 8
-    sos = ss.butter(order, fc, btype = 'low', analog = False, output = 'sos', fs = sampling_rate) 
-    envelope = np.exp( ss.sosfiltfilt(sos, np.log(np.abs(signal))))    
+    b, a = ss.butter(order, 2 * f_LPF / fs, 'low')
+    envelope = np.exp(ss.filtfilt(b, a, np.log(np.abs(ss.hilbert(signal)))))
+    
+    # Remove spurious spikes in first sample:
+    envelope[0] = envelope[1]   
 
     return utils.ReturnTuple((envelope,), 
                              ('homomorphic_envelope',))
@@ -280,3 +303,154 @@ def identify_heart_sounds(beats = None, sampling_rate = 1000.):
     classification += 1    
         
     return utils.ReturnTuple((classification,), ('heart_sounds',))
+
+def ecg_based_segmentation(pcg_signal=None, ecg_signal=None,sampling_rate=1000.0,show=False):
+    
+    """Assign state labels to PCG recording based on markers from simultaneous ECG signal.
+
+    Adapted to Python from original MATLAB code written by David Springer, 2016 (C), for 
+    comparison purposes in the paper [Springer15]_.
+    Available at: https://github.com/davidspringer/Springer-Segmentation-Code 
+    
+    Heart sounds timing durations were obtained from [Schimdt10]_.
+    
+    Parameters
+    ----------
+    pcg_signal : array
+        PCG signal to be segmented.
+    ecg_signal : array
+        Simultaneous ECG signal.
+    sampling_rate : int, float, optional
+        Sampling frequency (Hz) of both signals.
+    show : bool, optional
+        If True, show a plot with the segmented signal.
+        
+    Returns
+    -------
+    states : array
+        State labels of PCG recording
+
+    References
+    ----------
+    .. [Springer15] D.Springer, "Logistic Regression-HSMM-based Heart Sound Segmentation",
+       IEEE Trans. Biomed. Eng., In Press, 2015.
+    .. [Schimdt10] S. E. Schmidt et al., "Segmentation of heart sound recordings by a 
+       duration-dependent hidden Markov model", Physiol. Meas., 2010    
+    """
+    
+    # ensure numpy
+    pcg_signal = np.array(pcg_signal)
+    ecg_signal = np.array(ecg_signal)
+    sampling_rate = float(sampling_rate)    
+
+    # Compute homomorphic envelope to find peaks
+    envelope, = homomorphic_filter(pcg_signal,sampling_rate=sampling_rate)
+    envelope, = st.normalize(envelope)
+        
+    states = np.zeros((len(envelope),))
+    
+    # Extract locations for R peaks and end T-waves
+    ecg_out = ecg.ecg(ecg_signal,sampling_rate=sampling_rate,show=False)
+    rpeaks = ecg_out['rpeaks'].astype('int64')
+    t_positions = ecg.getTPositions(ecg_out)
+    t_ends = t_positions["T_end_positions"]
+    
+    #Timing durations from Schmidt:
+    mean_S1 = 0.122*sampling_rate
+    std_S1 = 0.022*sampling_rate
+    mean_S2 = 0.092*sampling_rate
+    std_S2 = 0.022*sampling_rate
+
+    # Set duration from each R-peak to (R-peak+mean_S1) as first state S1.
+    # Upper and lower bounds are set to avoid errors of searching outside size of the signal
+    for peak in rpeaks:
+
+        upper_bound = int(min([len(states), peak + mean_S1]))
+        states[peak:min([upper_bound-1,len(states)])] = 1
+    
+    # Set S2 as state 3 depending on position of end T-wave in ECG
+    for t_end in t_ends:
+        
+        # find search window of envelope: T-end +- mean+1std
+        lower_bound = int(max([t_end - np.floor((mean_S2 + std_S2)),1]))
+        upper_bound = int(min([len(states), np.ceil(t_end + np.floor(mean_S2 + std_S2))]))
+
+        search_window = envelope[lower_bound-1:upper_bound]*(states[lower_bound-1:upper_bound]!=1).ravel()
+        
+        # Find the maximum value of the envelope in the search window:
+        S2_index = np.argmax(search_window)
+        
+        # Find the actual index in the envelope of the maximum peak.
+        # Make sure this has a max value of the length of the signal:
+        S2_index = min([len(states),lower_bound+ S2_index-1])
+        
+        # Set the states to state 3, centered on the S2 peak, +- 1/2 of the
+        # expected S2 sound duration.
+        upper_bound = int(min([len(states), np.ceil(S2_index +((mean_S2)/2))]))
+        states[int(max([np.ceil(S2_index - ((mean_S2)/2)),1]))-1:upper_bound] = 3
+        
+        # Set the spaces between state 3 and the next R peak as state 4:
+        # Find the next rpeak after this S2. Exclude those that happened before by setting them to infinity.
+        diffs = (rpeaks - t_end).astype(float)
+        diffs[diffs<0] = np.inf
+        
+        # If the array is empty, then no S1s after this S2, so set to end of signal:
+        if np.size(diffs[diffs<np.inf])==0:
+            end_pos = len(states)
+        else:
+            # else, send the end position to the minimum diff
+            index = np.argmin(diffs)
+            end_pos = rpeaks[index]
+            
+        states[int(np.ceil(S2_index +((mean_S2 +(0*std_S2))/2))-1):end_pos] = 4
+    
+    # Set first and last sections of the signal (before first R-peak, and after last end T-wave)
+    first_location_of_definite_state = np.argwhere(states!=0)[0][0]
+
+    if first_location_of_definite_state > 0:
+        if states[first_location_of_definite_state] == 1:
+            states[0:first_location_of_definite_state] = 4
+        
+        if states[first_location_of_definite_state] == 3:
+            states[0:first_location_of_definite_state+1] = 2    
+    
+    last_location_of_definite_state = np.argwhere(states!=0)[-1][0]
+    
+    if last_location_of_definite_state > 0:
+        
+        if states[last_location_of_definite_state] == 1:
+            states[last_location_of_definite_state:] = 2
+        
+        if states[last_location_of_definite_state] == 1:
+            states[last_location_of_definite_state:] = 4
+    
+    #Set everywhere else as state 2:        
+    states[states == 0] = 2
+    
+    if show:
+        fig, ax = plt.subplots(figsize=(15, 4))
+        t = np.linspace(0,round(len(pcg_signal)/sampling_rate),len(pcg_signal))
+    
+        ax.plot(t, pcg_signal, color='black')
+        
+        # arrange samples into groups of equal elements (split arrays into individual states)
+        time_intervals = np.split(t, np.where(np.diff(states) != 0)[0]+1)
+        states_intervals = np.split(states, np.where(np.diff(states) != 0)[0]+1)
+        
+        colors = ["green","red","pink","blue"]
+        y_lims = ax.get_ylim()
+
+        for i in range(len(time_intervals)):
+            ax.fill_between(time_intervals[i], y_lims[0], y_lims[1], color=colors[int(states_intervals[i][0]-1)], alpha=0.4)       
+        
+        legend_elements = [Patch(facecolor=colors[0],edgecolor=colors[0],alpha = 0.4,label='S1'),
+                           Patch(facecolor=colors[1],edgecolor=colors[1],alpha = 0.4,label='Systole'),
+                           Patch(facecolor=colors[2],edgecolor=colors[2],alpha = 0.4,label='S2'),
+                           Patch(facecolor=colors[3],edgecolor=colors[3],alpha = 0.4,label='Diastole')]
+
+        ax.legend(handles=legend_elements,bbox_to_anchor=(1.01, 1), loc='upper left')
+        plt.tight_layout()
+        plt.show()
+        
+    return utils.ReturnTuple((states,), 
+                             ('states',))
