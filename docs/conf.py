@@ -13,8 +13,11 @@
 # serve to show the default.
 
 import sys
-# import os
+import os
 # import shlex
+
+sys.path.insert(0, os.path.abspath("."))
+sys.path.insert(0, os.path.abspath("../"))
 
 # To be able to import to ReadTheDocs
 from mock import Mock as MagicMock
