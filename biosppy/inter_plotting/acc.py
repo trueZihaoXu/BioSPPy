@@ -10,9 +10,9 @@ This module provides an interactive display option for the ACC plot.
 
 """
 
+
 # Imports
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.backend_bases import key_press_handler
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from tkinter import *
@@ -109,7 +109,7 @@ def plot_acc(ts=None, raw=None, vm=None, sm=None, spectrum=None, path=None):
                     "padx": 10,
                 }
             # add an empty canvas for plotting
-            self.canvas = FigureCanvasTkAgg(self.figure, master=root)
+            self.canvas = matplotlib.backends.backend_tkagg.FigureCanvasTkAgg(self.figure, master=root)
             self.canvas.get_tk_widget().grid(**grid_params)
             self.canvas.draw()
             # self.axes.callbacks.connect('xlim_changed', on_xlims_change)
@@ -118,7 +118,7 @@ def plot_acc(ts=None, raw=None, vm=None, sm=None, spectrum=None, path=None):
             self.axes.clear()
             self.figure.clear()
             self.figure.canvas.draw_idle()
-            self.canvas = FigureCanvasTkAgg(self.figure, master=root)
+            self.canvas = matplotlib.backends.backend_tkagg.FigureCanvasTkAgg(self.figure, master=root)
             self.canvas.get_tk_widget().destroy()
 
         def add_toolbar(self, root: Tk, grid_params=None):
@@ -127,7 +127,7 @@ def plot_acc(ts=None, raw=None, vm=None, sm=None, spectrum=None, path=None):
             toolbarFramefeat = Frame(master=root)
             toolbarFramefeat.grid(**grid_params)
 
-            toolbarfeat = NavigationToolbar2Tk(self.canvas, toolbarFramefeat)
+            toolbarfeat = matplotlib.backends.backend_tkagg.NavigationToolbar2Tk(self.canvas, toolbarFramefeat)
             toolbarfeat.update()
 
         def add_plot(self, feature_name: str, xdata, ydata, linewidth, label, color):
@@ -476,19 +476,19 @@ def plot_acc(ts=None, raw=None, vm=None, sm=None, spectrum=None, path=None):
     drop_features2.get_menu().config(state="disabled")
     drop_features2.get_menu().update()
 
-    canvas_raw = FigureCanvasTkAgg(fig, master=root)
+    canvas_raw = matplotlib.backends.backend_tkagg.FigureCanvasTkAgg(fig, master=root)
     canvas_raw.get_tk_widget().grid(row=2, column=0, columnspan=1, sticky="w", padx=10)
     canvas_raw.draw()
 
     toolbarFrame = Frame(master=root)
     toolbarFrame.grid(row=5, column=0, columnspan=1, sticky=W)
-    toolbar = NavigationToolbar2Tk(canvas_raw, toolbarFrame)
+    toolbar = matplotlib.backends.backend_tkagg.NavigationToolbar2Tk(canvas_raw, toolbarFrame)
     toolbar.update()
 
     # Add key functionality
     def on_key(event):
         # print('You pressed {}'.format(event.key))
-        key_press_handler(event, canvas_raw, toolbar)
+        matplotlib.backend_bases.key_press_handler(event, canvas_raw, toolbar)
 
     canvas_raw.mpl_connect("key_press_event", on_key)
 

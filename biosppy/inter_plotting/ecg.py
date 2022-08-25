@@ -12,7 +12,7 @@ This module provides an interactive display option for the ECG plot.
 
 # Imports
 from matplotlib import gridspec
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+import matplotlib
 
 # from matplotlib.backends.backend_wx import *
 import matplotlib.pyplot as plt
@@ -103,7 +103,7 @@ def plot_ecg(
     axs_raw[2].legend()
     axs_raw[2].grid()
 
-    canvas_raw = FigureCanvasTkAgg(fig_raw, master=root_tk)
+    canvas_raw = matplotlib.backends.backend_tkagg.FigureCanvasTkAgg(fig_raw, master=root_tk)
     canvas_raw.get_tk_widget().grid(
         row=0, column=0, columnspan=1, rowspan=6, sticky="w"
     )
@@ -111,7 +111,7 @@ def plot_ecg(
 
     toolbarFrame = Frame(master=root_tk)
     toolbarFrame.grid(row=6, column=0, columnspan=1, sticky=W)
-    toolbar = NavigationToolbar2Tk(canvas_raw, toolbarFrame)
+    toolbar = matplotlib.backends.backend_tkagg.NavigationToolbar2Tk(canvas_raw, toolbarFrame)
     toolbar.update()
 
     fig = fig_raw
@@ -128,13 +128,13 @@ def plot_ecg(
     axs_2.grid()
 
     grid_params = {"row": 0, "column": 1, "columnspan": 2, "rowspan": 6, "sticky": "w"}
-    canvas_2 = FigureCanvasTkAgg(fig_2, master=root_tk)
+    canvas_2 = matplotlib.backends.backend_tkagg.FigureCanvasTkAgg(fig_2, master=root_tk)
     canvas_2.get_tk_widget().grid(**grid_params)
     canvas_2.draw()
 
     toolbarFrame_2 = Frame(master=root_tk)
     toolbarFrame_2.grid(row=6, column=1, columnspan=1, sticky=W)
-    toolbar_2 = NavigationToolbar2Tk(canvas_2, toolbarFrame_2)
+    toolbar_2 = matplotlib.backends.backend_tkagg.NavigationToolbar2Tk(canvas_2, toolbarFrame_2)
     toolbar_2.update()
 
     if show:
