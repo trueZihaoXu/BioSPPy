@@ -9,8 +9,7 @@ Implemented code assumes ACC acquisition from a 3 orthogonal axis reference syst
 :copyright: (c) 2015-2018 by Instituto de Telecomunicacoes
 :license: BSD 3-clause, see LICENSE for more details.
 
-Authors
--------
+Authors:
 Afonso Ferreira
 Diogo Vieira
 
