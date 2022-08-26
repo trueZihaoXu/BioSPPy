@@ -15,12 +15,12 @@ Modules
     :undoc-members:
     :show-inheritance:
 
-.. automodule:: biosppy.signals.bvp
+.. automodule:: biosppy.signals.acc
     :members:
     :undoc-members:
     :show-inheritance:
 
-.. automodule:: biosppy.signals.ppg
+.. automodule:: biosppy.signals.bvp
     :members:
     :undoc-members:
     :show-inheritance:
@@ -41,6 +41,16 @@ Modules
     :show-inheritance:
 
 .. automodule:: biosppy.signals.emg
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: biosppy.signals.pcg
+    :members:
+    :undoc-members:
+    :show-inheritance:
+    
+.. automodule:: biosppy.signals.ppg
     :members:
     :undoc-members:
     :show-inheritance:
