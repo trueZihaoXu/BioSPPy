@@ -1376,15 +1376,16 @@ def ASI_segmenter(signal=None, sampling_rate=1000.0, Pth=5.0):
 
 
 def getQPositions(ecg_proc=None, show=False):
-    
     """Different ECG Waves (Q, R, S, ...) are not present or are not so clear to identify in all ECG signals (I II III V1 V2 V3, ...)
     For Q wave we suggest to use signals I, aVL . Avoid II, III, V1, V2, V3, V4, aVR, aVF
+    
     Parameters
     ----------
     signal : object
     object return by the function ecg.
     show : bool, optional
     If True, show a plot of the Q Positions on every signal sample/template.
+
     Returns
     -------
     Q_positions : array
@@ -1394,7 +1395,7 @@ def getQPositions(ecg_proc=None, show=False):
     """
 
     templates_ts = ecg_proc["templates_ts"]
-    template_r_position = np.argmin(np.abs(templates_ts - 0))  # R peek on the template is always on time instant 0 seconds
+    template_r_position = np.argmin(np.abs(templates_ts - 0))  # R peak on the template is always on time instant 0 seconds
     Q_positions = []
     Q_start_positions = []
     Q_positions_template = []
@@ -1404,7 +1405,6 @@ def getQPositions(ecg_proc=None, show=False):
         # Get Q Position
         template_left = each[0 : template_r_position + 1]
         mininums_from_template_left = argrelextrema(template_left, np.less)
-        # print("Q position= " + str(mininums_from_template_left[0][-1]))
         try:
             Q_position = ecg_proc["rpeaks"][n] - (
                 template_r_position - mininums_from_template_left[0][-1]
@@ -1417,8 +1417,6 @@ def getQPositions(ecg_proc=None, show=False):
         # Get Q start position
         template_Q_left = each[0 : mininums_from_template_left[0][-1] + 1]
         maximum_from_template_Q_left = argrelextrema(template_Q_left, np.greater)
-        # print("Q start position=" + str(maximum_from_template_Q_left[0][-1]))
-        # print("Q start value=" + str(template_Q_left[maximum_from_template_Q_left[0][-1]]))
         try:
             Q_start_position = (
                 ecg_proc["rpeaks"][n]
@@ -1456,15 +1454,16 @@ def getQPositions(ecg_proc=None, show=False):
 
 
 def getSPositions(ecg_proc=None, show=False):
-    
     """Different ECG Waves (Q, R, S, ...) are not present or are not so clear to identify in all ECG signals (I II III V1 V2 V3, ...)
        For S wave we suggest to use signals V1, V2, V3. Avoid I, V5, V6, aVR, aVL
+    
     Parameters
     ----------
     signal : object
     object return by the function ecg.
     show : bool, optional
     If True, show a plot of the S Positions on every signal sample/template.
+    
     Returns
     -------
     S_positions : array
@@ -1494,8 +1493,6 @@ def getSPositions(ecg_proc=None, show=False):
             pass
         # Get S end position
         maximums_from_template_right = argrelextrema(template_right, np.greater)
-        # print("S end position=" + str(maximums_from_template_right[0][0]))
-        # print("S end value=" + str(template_right[maximums_from_template_right[0][0]]))
         try:
             S_end_position = ecg_proc["rpeaks"][n] + maximums_from_template_right[0][0]
             S_end_positions.append(S_end_position)
@@ -1532,15 +1529,16 @@ def getSPositions(ecg_proc=None, show=False):
 
 
 def getPPositions(ecg_proc=None, show=False):
-    
     """Different ECG Waves (Q, R, S, ...) are not present or are not so clear to identify in all ECG signals (I II III V1 V2 V3, ...)
        For P wave we suggest to use signals II, V1, aVF . Avoid I, III, V1, V2, V3, V4, V5, AVL
+    
     Parameters
     ----------
     signal : object
     object return by the function ecg.
     show : bool, optional
     If True, show a plot of the P Positions on every signal sample/template.
+    
     Returns
     -------
     P_positions : array
