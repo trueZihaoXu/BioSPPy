@@ -147,7 +147,8 @@ def find_peaks(signal=None,sampling_rate=1000.):
     return utils.ReturnTuple((peaks,envelope), 
                              ('peaks','homomorphic_envelope'))
 
-def homomorphic_filter(signal=None, sampling_rate=1000., f_LPF=8, order=1):
+
+def homomorphic_filter(signal=None, sampling_rate=1000., f_LPF=8, order=2):
     
     """Finds the homomorphic envelope of a signal.
 
