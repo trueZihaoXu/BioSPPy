@@ -74,10 +74,10 @@ def pcg(signal=None, sampling_rate=1000., path=None, show=True):
     passBand = np.array([25, 400])
     
     # Band-Pass filtering of the PCG:        
-    filtered,fs,params = st.filter_signal(signal,'butter','bandpass',order,passBand,sampling_rate)
+    filtered, fs, params = st.filter_signal(signal, 'butter', 'bandpass', order, passBand, sampling_rate)
 
     # find peaks
-    peaks,envelope = find_peaks(signal=signal, sampling_rate=sampling_rate)
+    peaks, envelope = find_peaks(signal=signal, sampling_rate=sampling_rate)
     
     # classify heart sounds
     hs, = identify_heart_sounds(beats=peaks, sampling_rate=sampling_rate)
@@ -149,7 +149,6 @@ def find_peaks(signal=None,sampling_rate=1000.):
 
 
 def homomorphic_filter(signal=None, sampling_rate=1000., f_LPF=8, order=2):
-    
     """Finds the homomorphic envelope of a signal.
 
     Adapted to Python from original MATLAB code written by David Springer, 2016 (C), for
@@ -191,11 +190,10 @@ def homomorphic_filter(signal=None, sampling_rate=1000., f_LPF=8, order=2):
     f_LPF = float(f_LPF)
     
     # Filter Design
-    order = 2
     passBand = np.array([25, 400])
     
     # Band-Pass filtering of the PCG:        
-    signal,fs,params = st.filter_signal(signal,'butter','bandpass',order,passBand,sampling_rate)
+    signal, fs, params = st.filter_signal(signal, 'butter', 'bandpass', order, passBand, sampling_rate)
     
     # LP-filter Design (to reject the oscillating component of the signal):
     b, a = ss.butter(order, 2 * f_LPF / fs, 'low')
@@ -305,7 +303,7 @@ def identify_heart_sounds(beats = None, sampling_rate = 1000.):
         
     return utils.ReturnTuple((classification,), ('heart_sounds',))
 
-def ecg_based_segmentation(pcg_signal=None, ecg_signal=None,sampling_rate=1000.0,show=False):
+def ecg_based_segmentation(pcg_signal=None, ecg_signal=None, sampling_rate=1000.0, show=False):
     
     """Assign state labels to PCG recording based on markers from simultaneous ECG signal.
 
@@ -345,13 +343,13 @@ def ecg_based_segmentation(pcg_signal=None, ecg_signal=None,sampling_rate=1000.0
     sampling_rate = float(sampling_rate)    
 
     # Compute homomorphic envelope to find peaks
-    envelope, = homomorphic_filter(pcg_signal,sampling_rate=sampling_rate)
+    envelope, = homomorphic_filter(pcg_signal, sampling_rate=sampling_rate)
     envelope, = st.normalize(envelope)
         
     states = np.zeros((len(envelope),))
     
     # Extract locations for R peaks and end T-waves
-    ecg_out = ecg.ecg(ecg_signal,sampling_rate=sampling_rate,show=False)
+    ecg_out = ecg.ecg(ecg_signal, sampling_rate=sampling_rate, show=False)
     rpeaks = ecg_out['rpeaks'].astype('int64')
     t_positions = ecg.getTPositions(ecg_out)
     t_ends = t_positions["T_end_positions"]
@@ -425,7 +423,7 @@ def ecg_based_segmentation(pcg_signal=None, ecg_signal=None,sampling_rate=1000.0
         if states[last_location_of_definite_state] == 1:
             states[last_location_of_definite_state:] = 4
     
-    #Set everywhere else as state 2:        
+    # Set everywhere else as state 2:        
     states[states == 0] = 2
     
     if show:
@@ -455,3 +453,4 @@ def ecg_based_segmentation(pcg_signal=None, ecg_signal=None,sampling_rate=1000.0
         
     return utils.ReturnTuple((states,), 
                              ('states',))
+                             
