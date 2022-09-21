@@ -1639,16 +1639,18 @@ def getPPositions(ecg_proc=None, show=False):
         
     return utils.ReturnTuple((P_positions, P_start_positions, P_end_positions,), ("P_positions","P_start_positions","P_end_positions",))
 
+
 def getTPositions(ecg_proc=None, show=False):
-    
     """Different ECG Waves (Q, R, S, ...) are not present or are not so clear to identify in all ECG signals (I II III V1 V2 V3, ...)
     For T wave we suggest to use signals V4, v5 (II, V3 have good results, but in less accuracy) . Avoid I, V1, V2, aVR, aVL
+    
     Parameters
     ----------
     signal : object
     object return by the function ecg.
     show : bool, optional
     If True, show a plot of the T Positions on every signal sample/template.
+    
     Returns
     -------
     T_positions : array
@@ -1694,7 +1696,6 @@ def getTPositions(ecg_proc=None, show=False):
             template_r_position : template_T_position_min + max_from_template_right
         ]
         min_from_template_T_left = argrelextrema(template_T_left, np.less)
-        # print("T start position=" + str(template_r_position+min_from_template_T_left[0][-1]))
         
         try:
             T_start_position = ecg_proc["rpeaks"][n] + min_from_template_T_left[0][-1]
@@ -1708,7 +1709,6 @@ def getTPositions(ecg_proc=None, show=False):
         template_T_right = each[template_T_position_min + max_from_template_right :]
 
         mininums_from_template_T_right = argrelextrema(template_T_right, np.less)
-        # print("T end position=" + str(template_T_position_min + max_from_template_right + mininums_from_template_T_right[0][0]))
         
         try:
             T_end_position = (
