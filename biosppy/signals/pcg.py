@@ -77,7 +77,7 @@ def pcg(signal=None, sampling_rate=1000., path=None, show=True):
     filtered, fs, params = st.filter_signal(signal, 'butter', 'bandpass', order, passBand, sampling_rate)
 
     # find peaks
-    peaks, envelope = find_peaks(signal=signal, sampling_rate=sampling_rate)
+    peaks, envelope = find_peaks(signal=filtered, sampling_rate=sampling_rate)
     
     # classify heart sounds
     hs, = identify_heart_sounds(beats=peaks, sampling_rate=sampling_rate)
