@@ -304,7 +304,6 @@ def identify_heart_sounds(beats = None, sampling_rate = 1000.):
     return utils.ReturnTuple((classification,), ('heart_sounds',))
 
 def ecg_based_segmentation(pcg_signal=None, ecg_signal=None, sampling_rate=1000.0, show=False):
-    
     """Assign state labels to PCG recording based on markers from simultaneous ECG signal.
 
     Adapted to Python from original MATLAB code written by David Springer, 2016 (C), for 

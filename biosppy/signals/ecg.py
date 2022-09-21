@@ -1593,7 +1593,6 @@ def getPPositions(ecg_proc=None, show=False):
         template_P_right = each[max_from_template_left : template_p_position_max + 1]
         mininums_from_template_right = argrelextrema(template_P_right, np.less)
         
-        # print("P end position=" + str(mininums_from_template_right[0][0]+max_from_template_left))
         try:
             P_end_position = (
                 ecg_proc["rpeaks"][n]
