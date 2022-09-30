@@ -21,9 +21,11 @@ import copy
 import keyword
 import os
 import re
+from typing import Collection
 
 # 3rd party
 import numpy as np
+from numpy import ndarray
 
 
 def normpath(path):
@@ -437,3 +439,59 @@ class ReturnTuple(tuple):
         """
 
         return list(self._names)
+
+    def append(self, new_values: (int, float, complex, str, Collection, ndarray), new_keys=None):
+        """
+        Returns a new ReturnTuple with the new values and keys appended to the original object.
+
+        Parameters
+        ----------
+        new_values : int, float, list, tuple, dict, array
+            Values to append. If given a dict and new_keys is None, the correspondent keys and values will be used.
+        new_keys : str, list, tuple, optional
+            Keys to append.
+
+        Returns
+        -------
+        object : ReturnTuple
+            A ReturnTuple with the values and keys appended.
+
+        """
+
+        # initialize tuples
+        values, keys = (), ()
+
+        # check input
+        if isinstance(new_values, ReturnTuple):
+            raise ValueError("new_values is a ReturnTuple object. Use the join method instead.")
+
+        # add values and keys from dict if new_keys is empty
+        if new_keys is None:
+            if isinstance(new_values, dict):
+                keys = tuple(self.keys()) + tuple(new_values.keys())
+                values = self + tuple(new_values.values())
+
+            else:
+                raise ValueError('new_keys is empty. Please provide new_keys or use a dict.')
+
+        else:
+            # add a single value, key pair
+            if isinstance(new_keys, str):
+                keys = tuple(self.keys()) + tuple([new_keys])
+                values = self + tuple([new_values])
+
+            # add multiple value, key pairs
+            else:
+                # check length
+                if len(new_keys) != len(new_values):
+                    raise ValueError("new_keys and new_values don't have the same length.")
+
+                temp_keys, temp_values = (), ()
+                for key, value in zip(new_keys, new_values):
+                    temp_keys += tuple([key])
+                    temp_values += tuple([value])
+
+                keys = tuple(self.keys()) + temp_keys
+                values = self + temp_values
+
+        return ReturnTuple(values, keys)
