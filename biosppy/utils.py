@@ -439,8 +439,8 @@ class ReturnTuple(tuple):
         """
 
         return list(self._names)
-    
-        def append(self, new_values: (int, float, complex, str, Collection, ndarray), new_keys=None):
+
+    def append(self, new_values: (int, float, complex, str, Collection, ndarray), new_keys=None):
         """
         Returns a new ReturnTuple with the new values and keys appended to the original object.
 
