@@ -475,12 +475,12 @@ class ReturnTuple(tuple):
                 raise ValueError('new_keys is empty. Please provide new_keys or use a dict.')
 
         else:
-            # add a single value, key pair
+            # add a single value-key pair
             if isinstance(new_keys, str):
                 keys = tuple(self.keys()) + tuple([new_keys])
                 values = self + tuple([new_values])
 
-            # add multiple value, key pairs
+            # add multiple value-key pairs
             else:
                 # check length
                 if len(new_keys) != len(new_values):
@@ -518,4 +518,4 @@ class ReturnTuple(tuple):
         values = self + new_tuple
         keys = tuple(self.keys()) + tuple(new_tuple.keys())
 
-        return ReturnTuple(values, keys)    
+        return ReturnTuple(values, keys)
