@@ -14,6 +14,7 @@ This module provides several frequently used functions and hacks.
 from __future__ import absolute_import, division, print_function
 from six.moves import map, range, zip
 import six
+from typing import Collection
 
 # built-in
 import collections
@@ -21,11 +22,10 @@ import copy
 import keyword
 import os
 import re
-from typing import Collection
+from numpy import ndarray
 
 # 3rd party
 import numpy as np
-from numpy import ndarray
 
 
 def normpath(path):
@@ -439,8 +439,8 @@ class ReturnTuple(tuple):
         """
 
         return list(self._names)
-
-    def append(self, new_values: (int, float, complex, str, Collection, ndarray), new_keys=None):
+    
+        def append(self, new_values: (int, float, complex, str, Collection, ndarray), new_keys=None):
         """
         Returns a new ReturnTuple with the new values and keys appended to the original object.
 
@@ -515,7 +515,7 @@ class ReturnTuple(tuple):
         if isinstance(new_tuple, ReturnTuple):
             raise TypeError('new_tuple must be a ReturnTuple object.')
 
-        new_values = self + new_tuple
-        new_keys = tuple(self.keys()) + tuple(new_tuple.keys())
+        values = self + new_tuple
+        keys = tuple(self.keys()) + tuple(new_tuple.keys())
 
-        return ReturnTuple(new_values, new_keys)
+        return ReturnTuple(values, keys)    
