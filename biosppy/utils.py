@@ -495,3 +495,27 @@ class ReturnTuple(tuple):
                 values = self + temp_values
 
         return ReturnTuple(values, keys)
+
+    def join(self, new_tuple):
+        """
+        Returns a ReturnTuple with the new ReturnTuple appended.
+
+        Parameters
+        ----------
+        new_tuple : ReturnTuple
+            ReturnTuple to be joined.
+
+        Returns
+        -------
+        object : ReturnTuple
+            The joined ReturnTuple.
+
+        """
+
+        if isinstance(new_tuple, ReturnTuple):
+            raise TypeError('new_tuple must be a ReturnTuple object.')
+
+        new_values = self + new_tuple
+        new_keys = tuple(self.keys()) + tuple(new_tuple.keys())
+
+        return ReturnTuple(new_values, new_keys)
