@@ -587,9 +587,12 @@ def plot_abp(ts=None,
         # close
         plt.close(fig)
 
+
 def plot_eda(ts=None,
              raw=None,
              filtered=None,
+             edr=None,
+             edl=None,
              onsets=None,
              peaks=None,
              amplitudes=None,
@@ -605,12 +608,16 @@ def plot_eda(ts=None,
         Raw EDA signal.
     filtered : array
         Filtered EDA signal.
+    edr : array
+        Electrodermal response signal.
+    edl : array
+        Electrodermal level signal.
     onsets : array
-        Indices of SCR pulse onsets.
+        Events onsets indices.
     peaks : array
-        Indices of the SCR peaks.
+        Events peaks indices.
     amplitudes : array
-        SCR pulse amplitudes.
+        Amplitudes location indices.
     path : str, optional
         If provided, the plot will be saved to the specified file.
     show : bool, optional
@@ -620,18 +627,20 @@ def plot_eda(ts=None,
 
     fig = plt.figure()
     fig.suptitle('EDA Summary')
+    gs = gridspec.GridSpec(6, 2)
 
     # raw signal
-    ax1 = fig.add_subplot(311)
+    ax1 = fig.add_subplot(gs[:2, 0])
 
-    ax1.plot(ts, raw, linewidth=MAJOR_LW, label='raw')
+    ax1.plot(ts, raw, linewidth=MAJOR_LW, label='Raw')
+    ax1.plot(ts, filtered, linewidth=MAJOR_LW, label='Filtered')
 
     ax1.set_ylabel('Amplitude')
     ax1.legend()
     ax1.grid()
 
-    # filtered signal with onsets, peaks
-    ax2 = fig.add_subplot(312, sharex=ax1)
+    # filtered signal with rpeaks
+    ax2 = fig.add_subplot(gs[2:4, 0], sharex=ax1)
 
     ymin = np.min(filtered)
     ymax = np.max(filtered)
@@ -640,31 +649,49 @@ def plot_eda(ts=None,
     ymin -= alpha
 
     ax2.plot(ts, filtered, linewidth=MAJOR_LW, label='Filtered')
-    ax2.vlines(ts[onsets], ymin, ymax,
-               color='m',
-               linewidth=MINOR_LW,
-               label='Onsets')
-    ax2.vlines(ts[peaks], ymin, ymax,
-               color='g',
-               linewidth=MINOR_LW,
-               label='Peaks')
+    ax2.plot(ts[onsets], filtered[onsets], ".", color='m', linewidth=MINOR_LW,
+             label='Onsets')
+    ax2.plot(ts[peaks], filtered[peaks], "x", color='g', linewidth=MINOR_LW,
+             label='peaks')
 
     ax2.set_ylabel('Amplitude')
     ax2.legend()
     ax2.grid()
 
-    # amplitudes
-    ax3 = fig.add_subplot(313, sharex=ax1)
+    # heart rate
+    ax3 = fig.add_subplot(gs[4:, 0], sharex=ax1)
 
-    ax3.plot(ts[onsets], amplitudes, linewidth=MAJOR_LW, label='Amplitudes')
+    ax3.plot(ts[onsets], amplitudes, linewidth=MAJOR_LW, label='Amplitude')
 
     ax3.set_xlabel('Time (s)')
     ax3.set_ylabel('Amplitude')
     ax3.legend()
     ax3.grid()
 
+    # eda decomposition - edl
+    ax4 = fig.add_subplot(gs[1:4, 1])
+
+    ax4.plot(ts, filtered, linewidth=MINOR_LW, label="filtered")
+    ax4.plot(ts, edl, 'm', linewidth=MINOR_LW, alpha=0.7, label="EDL")
+
+    ax4.set_ylabel('Amplitude')
+    ax4.set_title('EDA Decomposition')
+    ax4.legend()
+    ax4.grid()
+
+    # eda decomposition - edr
+    ax5 = fig.add_subplot(gs[4:, 1])
+    ax5.get_shared_x_axes().join(ax4, ax5)
+
+    ax5.plot(ts[1:], edr, 'm', linewidth=MINOR_LW, alpha=0.7, label="EDR")
+
+    ax5.set_ylabel('Amplitude')
+    ax5.set_xlabel('Time (s)')
+    ax5.legend()
+    ax5.grid()
+
     # make layout tight
-    fig.tight_layout()
+    gs.tight_layout(fig)
 
     # save to file
     if path is not None:
@@ -1417,7 +1444,7 @@ def plot_pcg(ts=None,
     ax1 = fig.add_subplot(gs[:2, 0])
 
     ax1.plot(ts, raw, linewidth=MAJOR_LW,label='raw')
-    
+
     ax1.set_ylabel('Amplitude')
     ax1.legend()
     ax1.grid()
@@ -1430,7 +1457,7 @@ def plot_pcg(ts=None,
     alpha = 0.1 * (ymax - ymin)
     ymax += alpha
     ymin -= alpha
-    
+
     ax2.plot(ts, filtered, linewidth=MAJOR_LW, label='Filtered')
     ax2.vlines(ts[peaks], ymin, ymax,
                 color='m',
@@ -1445,12 +1472,12 @@ def plot_pcg(ts=None,
     ax3 = fig.add_subplot(gs[4:, 0], sharex=ax1)
 
     ax3.plot(heart_rate_ts,inst_heart_rate, linewidth=MAJOR_LW, label='Heart rate')
-    
+
     ax3.set_xlabel('Time (s)')
     ax3.set_ylabel('Heart Rate (bpm)')
     ax3.legend()
     ax3.grid()
-    
+
     # heart sounds
     ax4 = fig.add_subplot(gs[1:5, 1])
 
@@ -1458,8 +1485,8 @@ def plot_pcg(ts=None,
     for i in range(0, len(peaks)):
 
         text = "S" + str(int(heart_sounds[i]))
-        plt.annotate(text,(ts[peaks[i]], ymax-alpha),ha='center', va='center',size = 13) 
-            
+        plt.annotate(text,(ts[peaks[i]], ymax-alpha),ha='center', va='center',size = 13)
+
     ax4.set_xlabel('Time (s)')
     ax4.set_ylabel('Amplitude')
     ax4.set_title('Heart sounds')
