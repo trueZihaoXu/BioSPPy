@@ -963,12 +963,20 @@ def signal_stats(signal=None):
         Maximum signal value.
     max_amp : float
         Maximum absolute signal amplitude, in relation to the mean.
+    range : float
+        Signal range (max - min).
+    q1 : float
+        First quartile of the signal.
+    q3 : float
+        Third quartile of the signal.
     var : float
         Signal variance (unbiased).
     std_dev : float
         Standard signal deviation (unbiased).
     abs_dev : float
         Mean absolute signal deviation around the median.
+    rms : float
+        Root-mean-square of the signal.
     kurtosis : float
         Signal kurtosis (unbiased).
     skew : float
@@ -998,6 +1006,9 @@ def signal_stats(signal=None):
     # maximum amplitude
     maxAmp = np.abs(signal - mean).max()
 
+    # range
+    rng = maxVal - minVal
+
     # variance
     sigma2 = signal.var(ddof=1)
 
@@ -1007,26 +1018,20 @@ def signal_stats(signal=None):
     # absolute deviation
     ad = np.mean(np.abs(signal - median))
 
+    # root-mean-square
+    rms = np.sqrt(np.mean(signal**2))
+
     # kurtosis
     kurt = stats.kurtosis(signal, bias=False)
 
-    # skweness
+    # skewness
     skew = stats.skew(signal, bias=False)
 
     # output
-    args = (mean, median, minVal, maxVal, maxAmp, sigma2, sigma, ad, kurt, skew)
-    names = (
-        "mean",
-        "median",
-        "min",
-        "max",
-        "max_amp",
-        "var",
-        "std_dev",
-        "abs_dev",
-        "kurtosis",
-        "skewness",
-    )
+    args = (mean, median, minVal, maxVal, maxAmp, rng, sigma2, sigma, ad, rms,
+            kurt, skew)
+    names = ("mean", "median", "min", "max", "max_amp", "range", "var", "std_dev",
+             "abs_dev", "rms", "kurtosis", "skew")
 
     return utils.ReturnTuple(args, names)
 
@@ -1114,7 +1119,7 @@ def find_extrema(signal=None, mode="both"):
     Returns
     -------
     extrema : array
-        Indices of the extrama points.
+        Indices of the extrema points.
     values : array
         Signal values at the extrema points.
 

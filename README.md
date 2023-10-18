@@ -1,10 +1,11 @@
 ```
+🎊 New module for feature extraction 🎊
+With the 'features' module you can easily extract features from your biosignals!
+(Check PR #4)
+```
+```
 🎉 New feature: You can now compute the activity index for ACC signals!
 (Check PR #14)
-```
-```
-🎊 New feature: We just added new functions for EDA feature extraction and
-decomposition! (Check PR #15)
 ```
 
 
