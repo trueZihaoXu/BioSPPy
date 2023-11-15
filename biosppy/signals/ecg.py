@@ -6,7 +6,7 @@ biosppy.signals.ecg
 This module provides methods to process Electrocardiographic (ECG) signals.
 Implemented code assumes a single-channel Lead I like ECG signal.
 
-:copyright: (c) 2015-2018 by Instituto de Telecomunicacoes
+:copyright: (c) 2015-2023 by Instituto de Telecomunicacoes
 :license: BSD 3-clause, see LICENSE for more details.
 
 """
@@ -30,7 +30,7 @@ from biosppy.inter_plotting import ecg as inter_plotting
 from scipy.signal import argrelextrema
 
 
-def ecg(signal=None, sampling_rate=1000.0, path=None, show=True, interactive=True):
+def ecg(signal=None, sampling_rate=1000.0, units=None, path=None, show=True, interactive=False):
     """Process a raw ECG signal and extract relevant signal features using
     default parameters.
 
@@ -40,6 +40,9 @@ def ecg(signal=None, sampling_rate=1000.0, path=None, show=True, interactive=Tru
         Raw ECG signal.
     sampling_rate : int, float, optional
         Sampling frequency (Hz).
+    units : str, optional
+        The units of the input signal. If specified, the plot will have the
+        y-axis labeled with the corresponding units.
     path : str, optional
         If provided, the plot will be saved to the specified file.
     show : bool, optional
@@ -143,6 +146,7 @@ def ecg(signal=None, sampling_rate=1000.0, path=None, show=True, interactive=Tru
                 templates=templates,
                 heart_rate_ts=ts_hr,
                 heart_rate=hr,
+                units=units,
                 path=path,
                 show=True,
             )

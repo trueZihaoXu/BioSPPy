@@ -1,11 +1,11 @@
 ```
+✨ New plotting design ✨
+New colors, new style and new features, check it out!
+```
+```
 🎊 New module for feature extraction 🎊
 With the 'features' module you can easily extract features from your biosignals!
 (Check PR #4)
-```
-```
-🎉 New feature: You can now compute the activity index for ACC signals!
-(Check PR #14)
 ```
 
 
@@ -59,7 +59,7 @@ out = ecg.ecg(signal=signal, sampling_rate=1000., show=True)
 
 This should produce a plot similar to the one below.
 
-[![Image](https://github.com/PIA-Group/BioSPPy/raw/master/docs/images/ECG_summary.png "ECG Summary Plot")]()
+![ECG summary example](docs/images/ECG_summary.png)
 
 ## Dependencies
 
