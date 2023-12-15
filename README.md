@@ -1,4 +1,8 @@
 ```
+🫀 New module for heart rate variability 🫀
+With the signals.hrv module you can now extract HRV features. Check it out! (PR #19)
+```
+```
 ✨ New plotting design ✨
 New colors, new style and new features, check it out!
 ```
@@ -39,6 +43,12 @@ Installation can be easily done with `pip`:
 
 ```bash
 $ pip install biosppy
+```
+
+Alternatively, you can install the latest version from the GitHub repository:
+
+```bash
+$ pip install git+https://github.com/scientisst/BioSPPy.git
 ```
 
 ## Simple Example

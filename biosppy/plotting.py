@@ -21,11 +21,13 @@ import os
 # 3rd party
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.patches as patches
+import matplotlib.lines as lines
 import numpy as np
 
 # local
 from . import utils
-from biosppy.signals import tools as st
+from .signals import tools as st
 
 # Globals
 MAJOR_LW = 1.5
@@ -2030,3 +2032,422 @@ def plot_clustering(data=None, clusters=None, path=None, show=False):
     else:
         # close
         plt.close(fig)
+
+
+def plot_rri(rri, rri_trend=None, legends=None, ax=None, show=False):
+    """Plot a series of RR intervals.
+
+    Parameters
+    ----------
+    rri : array
+        RR-intervals (ms).
+    rri_trend : array, optional
+        RR-intervals trend (ms).
+    legends : dict, optional
+        Dictionary of features to add to the plot legend.
+    ax : axis, optional
+        Plot Axis to use.
+    show : bool, optional
+        If True, show the plot immediately.
+    """
+
+    # time axis
+    t = np.cumsum(rri) / 1000.
+
+    # plot
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+        fig.suptitle('HRV - RR Intervals', fontsize=12, fontweight='bold')
+        fig.subplots_adjust(bottom=0.17)
+        add_logo(fig)
+
+    # plot signal
+    ax.plot(t, rri, color=color_palette('blue'), linewidth=MAJOR_LW,
+            label='RR Intervals')
+    ax.set_ylabel('RRI (ms)')
+    ax.set_xlabel('Time (s)')
+    if rri_trend is not None:
+        ax.plot(t, rri_trend, color=color_palette('dark-red'), alpha=0.5,
+                linewidth=MED_LW, label='Trend')
+
+    # plot legend
+    if legends is not None:
+        handles, labels = ax.get_legend_handles_labels()
+        for key, value in legends.items():
+            new_patch = patches.Patch(color='white', alpha=0)
+            handles.extend([new_patch])
+            labels.extend(['%s = %.2f %s' % (key, value[0], value[1])])
+
+        try:
+            pos = ax.get_position()
+            ax.set_position([pos.x0, pos.y0, pos.width * 0.9, pos.height])
+            ax.legend(handles=handles, labels=labels, loc='upper left',
+                      bbox_to_anchor=(1.01, 1.02), frameon=False)
+        except ValueError:
+            pass
+    else:
+        ax.legend(loc='upper right')
+
+    # show
+    if show:
+        plt.show()
+
+
+def plot_poincare(rri=None,
+                  s=None,
+                  sd1=None,
+                  sd2=None,
+                  legends=None,
+                  ax=None,
+                  show=False):
+    """Plot a Poincaré plot of a series of RR intervals (RRI[i+1] vs. RRI[i])
+    from the output of signals.hrv.compute_poincare.
+
+    Parameters
+    ----------
+    rri : array
+        RR-intervals (ms).
+    s : float
+        S - Area of the ellipse of the Poincaré plot (ms^2).
+    sd1 : float
+        SD1 - Poincaré plot standard deviation perpendicular to the identity
+        line (ms).
+    sd2 : float
+        SD2 - Poincaré plot standard deviation along the identity line (ms).
+    legends : dict, optional
+        Dictionary of features to add to the plot legend.
+    ax : axis, optional
+        Plot Axis to use.
+    show : bool, optional
+        If True, show the plot immediately.
+    """
+
+    x, y = rri[:-1], rri[1:]
+    rr_mean = rri.mean()
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(7, 5))
+        fig.suptitle('HRV - Poincaré Plot', fontsize=12, fontweight='bold')
+        # add logo
+        add_logo(fig)
+
+    ax.set_xlabel('$RR_i$ (ms)')
+    ax.set_ylabel('$RR_{i+1}$ (ms)')
+
+    # plot Poincaré data points
+    ax.scatter(x, y, marker='.', color=color_palette('blue'), alpha=0.5, s=100,
+               zorder=1)
+    ax.set_xlim([np.min(rri) - 50, np.max(rri) + 50])
+    ax.set_ylim([np.min(rri) - 50, np.max(rri) + 50])
+    ax.set_aspect(1. / ax.get_data_ratio())
+
+    # draw identity line (RRi+1=RRi)
+    lims = [np.min([ax.get_xlim(), ax.get_ylim()]),  # min of both axes
+            np.max([ax.get_xlim(), ax.get_ylim()])]  # max of both axes
+
+    ax.plot(lims, lims, linewidth=0.7, color=color_palette('grey'),
+            linestyle='--', zorder=2, label='Identity line')
+
+    # draw ellipse
+    ellipse = patches.Ellipse((rr_mean, rr_mean), sd1 * 2, sd2 * 2, angle=-45,
+                              linewidth=1, edgecolor=color_palette('dark-grey'),
+                              facecolor='None', label='S = %.1f ms$^2$' % s, zorder=3)
+    ax.add_artist(ellipse)
+
+    # draw SD1 and SD2
+    ax.arrow(rr_mean, rr_mean, sd1 * np.cos(3 * np.pi / 4), sd1 * np.sin(3 * np.pi / 4),
+             facecolor=color_palette('dark-red'), edgecolor=color_palette('dark-red'),
+             linewidth=2, length_includes_head=True, head_width=4, head_length=4,
+             label='SD1 = %.1f ms' % sd1, zorder=3)
+
+    ax.arrow(rr_mean, rr_mean, sd2 * np.cos(np.pi / 4), sd2 * np.sin(np.pi / 4),
+             facecolor=color_palette('yellow'), edgecolor=color_palette('yellow'),
+             linewidth=2, length_includes_head=True, head_width=4, head_length=4,
+             label='SD2 = %.1f ms' % sd2, zorder=3)
+
+    # draw SD1 and SD2 axes
+    f = 1.25  # scaling factor
+    ax.add_artist(
+        lines.Line2D([rr_mean - f * sd1 * np.cos(3 * np.pi / 4), rr_mean + f * sd1 * np.cos(3 * np.pi / 4)],
+                     [rr_mean + f * sd1 * np.cos(3 * np.pi / 4), rr_mean - f * sd1 * np.cos(3 * np.pi / 4)],
+                     lw=1, color='0.2'))
+
+    ax.add_artist(lines.Line2D([rr_mean - f * sd2 * np.cos(np.pi / 4), rr_mean + f * sd2 * np.cos(np.pi / 4)],
+                               [rr_mean - f * sd2 * np.cos(np.pi / 4), rr_mean + f * sd2 * np.cos(np.pi / 4)],
+                               lw=1, color='0.2'))
+    # adjust grid
+    ax.set_axisbelow(True)
+
+    # add extra labels
+    # update figure legend
+    handles, labels = ax.get_legend_handles_labels()
+    if legends is not None:
+        for key, value in legends.items():
+            if value is not None:
+                new_patch = patches.Patch(color='white', alpha=0)
+                handles.extend([new_patch])
+                labels.extend(['%s = %.2f' % (key, value)])
+
+    # change handle for ellipse and arrows
+    handles[1] = plt.Line2D([], [], color=color_palette('dark-grey'),
+                            marker="o", markersize=10, linewidth=0,
+                            markerfacecolor='none')  # ellipse
+    handles[2] = plt.Line2D([], [], color=color_palette('dark-red'),
+                            linestyle="-", linewidth=1)  # SD1
+    handles[3] = plt.Line2D([], [], color=color_palette('yellow'),
+                            linestyle="-", linewidth=1)  # SD2
+
+    # create legend
+    pos = ax.get_position()
+    ax.set_position([pos.x0, pos.y0, pos.width * 0.9, pos.height])
+    ax.legend(handles=handles, labels=labels, loc='upper left',
+              bbox_to_anchor=(1.01, 1.02), frameon=False)
+
+    # show
+    if show:
+        plt.show()
+
+
+def plot_hrv_hist(rri=None,
+                  bins=None,
+                  q_hist=None,
+                  hti=None,
+                  tinn=None,
+                  ax=None,
+                  show=False):
+    """Plots the RRI histogram with the corresponding geometrical HRV features
+    from the output of signals.hrv.compute_geometrical.
+
+    Parameters
+    ----------
+    rri : array
+        RR-intervals (ms).
+    bins : array
+        Histogram bins.
+    q_hist : array
+        Multilinear function fitted to the histogram.
+    hti : float
+        HTI - HRV triangular index - Integral of the density of the RR interval
+        histogram divided by its height.
+    tinn : float
+        TINN - Baseline width of RR interval histogram (ms).
+    ax : axis, optional
+        Plot Axis to use.
+    show : bool, optional
+        If True, show the plot immediately.
+    """
+
+    # plot histogram and triangle
+    if ax is None:
+        fig, ax = plt.subplots()
+        fig.suptitle('HRV - RRI Distribution', fontsize=12, fontweight='bold')
+
+        # add logo
+        add_logo(fig)
+
+    ax.hist(rri, bins, facecolor=color_palette('light-blue'),
+            edgecolor=color_palette('dark-grey'), label='HTI: %.1f' % hti)
+    ax.plot(bins, q_hist, color=color_palette('dark-red'), linewidth=1.5,
+            label='TINN: %.1f ms' % tinn)
+    ax.set_xlabel('RR Interval (ms)')
+    ax.set_ylabel('Count')
+    ax.locator_params(axis='y', integer=True)
+    pos = ax.get_position()
+    ax.set_position([pos.x0, pos.y0, pos.width * 0.9, pos.height])
+    ax.legend(loc='upper left',
+              bbox_to_anchor=(1.01, 1.02), frameon=False)
+
+    # adjust grid to be in the background
+    ax.set_axisbelow(True)
+
+    # show
+    if show:
+        plt.show()
+
+
+def plot_hrv_fbands(frequencies=None,
+                    powers=None,
+                    fbands=None,
+                    method_name=None,
+                    legends=None,
+                    ax=None,
+                    show=False):
+    """Plots the power spectrum and highlights the defined frequency bands
+    from the output of signals.hrv.compute_fbands.
+
+    Parameters
+    ----------
+    frequencies : array
+        Frequency axis.
+    powers : array
+        Power spectrum values for the frequency axis.
+    fbands : dict, optional
+        Dictionary containing the limits of the frequency bands.
+    method_name : str, optional
+        Method that was used to compute the power spectrum.
+    legends : dict, optional
+        Additional legend elements.
+    ax : axis, optional
+        Plot Axis to use.
+    show : bool, optional
+        If True, show the plot immediately.
+    """
+
+    spectrum_colors = {'ulf': '#e6eff6',
+                       'vlf': '#89b4c4',
+                       'lf': '#548999',
+                       'hf': '#f1d3a1',
+                       'vhf': '#e3dbd9'
+                       }
+
+    # convert power values
+    powers = powers / (10 ** 6)  # to s^2/Hz
+
+    # initialize plot
+    if ax is None:
+        fig, ax = plt.subplots()
+        fig.suptitle('HRV - Power Spectral Density', fontsize=12, fontweight='bold')
+        # add logo
+        add_logo(fig)
+
+    # figure attributes
+    if method_name is not None:
+        ax.set_title(f'({method_name})')
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('Power (s$^2$/Hz)')
+    ax.set_xlim([0, 0.5])
+
+    # plot spectrum
+    ax.plot(frequencies, powers, linewidth=1, color='0.2')
+    ax.margins(0)
+
+    # plot frequency bands
+    for fband in fbands.keys():
+        band = np.argwhere((frequencies >= fbands[fband][0]) & (frequencies <= fbands[fband][-1])).reshape(-1)
+        color = spectrum_colors[fband]
+        if len(band) > 0:
+            ax.fill_between(frequencies[band], powers[band], color=color,
+                            label=f'{fband.upper()}: {legends[fband+"_rpwr"]*100:.1f}%')
+
+    # update figure legend
+    handles, labels = ax.get_legend_handles_labels()
+    if legends.__len__() != 0:
+        for key, value in legends.items():
+            if not key.endswith('_rpwr') and value is not None:
+                new_patch = patches.Patch(color='white', alpha=0)
+                handles.extend([new_patch])
+                labels.extend(['%s = %.2f' % (key, value)])
+    pos = ax.get_position()
+    ax.set_position([pos.x0, pos.y0, pos.width * 0.9, pos.height])
+    ax.legend(handles=handles, labels=labels, loc='upper left',
+              bbox_to_anchor=(1.01, 1.02), frameon=False)
+
+    # adjust grid
+    ax.set_axisbelow(True)
+
+    # show
+    if show:
+        plt.show()
+
+
+def plot_hrv(rri,
+             rri_trend=None,
+             td_out=None,
+             nl_out=None,
+             fd_out=None,
+             show=False):
+    """Create a summary plot of a HRV analysis.
+
+    Parameters
+    ----------
+    rri : array
+        RR-intervals (ms).
+    rri_trend : array, optional
+        RR-intervals trend (ms).
+    td_out : dict
+        Output of signals.hrv.timedomain.
+    nl_out : dict
+        Output of signals.hrv.nonlinear.
+    fd_out : dict
+        Output of signals.hrv.frequencyomain.
+    show : bool, optional
+        If True, show the plot immediately.
+    """
+
+    # convert ReturnTuple to dict
+    if td_out is not None:
+        td_out = td_out.as_dict()
+    if nl_out is not None:
+        nl_out = nl_out.as_dict()
+    if fd_out is not None:
+        fd_out = fd_out.as_dict()
+
+    # plot
+    fig = plt.figure(figsize=(12, 6))
+    fig.suptitle('HRV Summary', fontsize=12, fontweight='bold')
+    gs = gridspec.GridSpec(6, 2)
+
+    # plot rri and display time domain features
+    ax1 = fig.add_subplot(gs[:2, 0])
+    time_legends = {'Mean': (td_out['rr_mean'], 'ms'),
+                    'Median': (td_out['rr_median'], 'ms'),
+                    'MinMax': (td_out['rr_minmax'], 'ms'),
+                    'SDNN': (td_out['sdnn'], 'ms'),
+                    'RMSSD': (td_out['rmssd'], 'ms'),
+                    'pNN50': (td_out['pnn50'], '%'),
+                    }
+    plot_rri(rri=rri, rri_trend=rri_trend, legends=time_legends, ax=ax1,
+             show=False)
+    ax1.set_title('Time Domain', fontweight='bold')
+
+    # plot hrv hist
+    ax2 = fig.add_subplot(gs[2:, 0])
+    bins = td_out['bins']
+    q_hist = td_out['q_hist']
+    hti = td_out['hti']
+    tinn = td_out['tinn']
+    plot_hrv_hist(rri=rri, bins=bins, q_hist=q_hist, hti=hti, tinn=tinn,
+                  ax=ax2, show=False)
+
+    # plot pointcare and display non-linear features
+    ax3 = fig.add_subplot(gs[:3, 1])
+    ax3.set_title('Non-linear Domain', fontweight='bold')
+    rri_pc = rri - rri_trend if rri_trend is not None else rri
+    s = nl_out['s']
+    sd1 = nl_out['sd1']
+    sd2 = nl_out['sd2']
+    poincare_legend = {'SD1/SD2': nl_out['sd12'],
+                       'SD2/SD1': nl_out['sd21'],
+                       'SampEn': nl_out['sampen'] if 'sampen' in nl_out.keys() else None,
+                       'AppEn': nl_out['appen'] if 'appen' in nl_out.keys() else None,
+                       }
+    plot_poincare(rri=rri_pc, s=s, sd1=sd1, sd2=sd2, legends=poincare_legend,
+                  ax=ax3, show=False)
+
+    # plot hrv fbands
+    ax4 = fig.add_subplot(gs[3:, 1])
+    frequencies = fd_out['frequencies']
+    powers = fd_out['powers']
+    fbands = fd_out['fbands']
+    method_name = fd_out['freq_method']
+    freq_legends = {'LF/HF': fd_out['lf_hf']}
+    for key in fd_out.keys():
+        if key.endswith('_rpwr'):
+            freq_legends[key] = fd_out[key]
+    plot_hrv_fbands(frequencies=frequencies, powers=powers, fbands=fbands,
+                    method_name=method_name, legends=freq_legends, ax=ax4,
+                    show=False)
+    ax4.set_title('Frequency Domain', fontweight='bold')
+
+    # tight layout
+    gs.tight_layout(fig)
+
+    # adjust margins
+    gs.update(right=0.88, bottom=0.14)
+
+    # add logo
+    add_logo(fig)
+
+    # show
+    if show:
+        plt.show()
