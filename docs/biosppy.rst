@@ -10,6 +10,9 @@ Packages
    :maxdepth: 1
 
    biosppy.signals
+   biosppy.features
+   biosppy.synthesizers
+   biosppy.inter_plotting
 
 Modules
 -------
@@ -33,6 +36,16 @@ Modules
     :show-inheritance:
 
 .. automodule:: biosppy.plotting
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: biosppy.quality
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: biosppy.stats
     :members:
     :undoc-members:
     :show-inheritance:
