@@ -992,3 +992,443 @@ def approximate_entropy(rri, m=2, r=0.2):
     n = len(rri)
 
     return _phi(m) - _phi(m + 1)
+
+
+def find_artifacts(peaks, sampling_rate):
+    '''find_artifacts: find and classify artifacts
+
+    Parameters
+    ----------
+        peaks: array
+            Vector containing indices of detected peaks (R waves locations)
+        sampling_rate : float
+            ECG sampling frequency, in Hz.
+
+    Returns
+    -------
+        artifacts: dictionary
+            Struct containing indices of detected artifacts.
+        subspaces: dictionary
+            Subspaces containing rr, drrs, mrrs, s12, s22, c1, c2 used to classify artifacts.
+    '''
+    c1 = 0.13
+    c2 = 0.17
+    alpha = 5.2
+    ww = 91
+    medfilt_order = 11
+
+    rr = np.diff(peaks) / sampling_rate
+    rr = np.insert(rr, 0, np.mean(rr))
+
+    # Artifact identification
+    drrs = np.diff(rr)
+    drrs = np.insert(drrs, 0, np.mean(drrs))
+    th1 = estimate_th(drrs, alpha, ww)  
+    drrs = drrs / th1
+
+    padding = 2
+
+    drrs_pad = np.pad(drrs, padding, "reflect")
+    
+    '''drrs_pad = np.pad(drrs, (padding, padding), 'symmetric')
+    drrs_pad[:padding] += 1
+    drrs_pad[-padding:] -= 1'''
+
+    s12 = np.zeros(len(drrs))
+    for d in range(padding, padding + len(drrs)):
+        if drrs_pad[d] > 0:
+            s12[d - padding] = max([drrs_pad[d - 1], drrs_pad[d + 1]])
+        elif drrs_pad[d] < 0:
+            s12[d - padding] = min([drrs_pad[d - 1], drrs_pad[d + 1]])
+
+    s22 = np.zeros(len(drrs))
+    for d in range(padding, padding + len(drrs)):
+        if drrs_pad[d] >= 0:
+            s22[d - padding] = min([drrs_pad[d + 1], drrs_pad[d + 2]])
+        elif drrs_pad[d] < 0:
+            s22[d - padding] = max([drrs_pad[d + 1], drrs_pad[d + 2]])
+
+    medrr = medfilt(rr, medfilt_order)
+    mrrs = rr - medrr
+    mrrs[mrrs < 0] *= 2
+    th2 = estimate_th(mrrs, alpha, ww) 
+    mrrs = mrrs / th2
+
+    # Artifacts classification
+    extra_indices = []
+    missed_indices = []
+    ectopic_indices = []
+    longshort_indices = []
+
+    i = 0
+    while i < len(rr) - 2:
+        if abs(drrs[i]) <= 1:
+            i += 1
+            continue
+
+        eq1 = (drrs[i] > 1) and (s12[i] < (-c1 * drrs[i] - c2))
+        eq2 = (drrs[i] < -1) and (s12[i] > (-c1 * drrs[i] + c2))
+
+        if any([eq1, eq2]):
+            ectopic_indices.append(i)
+            i += 1
+            continue
+
+        if not any([abs(drrs[i]) > 1, abs(mrrs[i]) > 3]):
+            i += 1
+            continue
+
+        longshort_candidates = [i]
+
+        if abs(drrs[i + 1]) < abs(drrs[i + 2]):
+            longshort_candidates.append(i + 1)
+
+        for j in longshort_candidates:
+            eq3 = (drrs[j] > 1) and (s22[j] < -1)
+            eq4 = abs(mrrs[j]) > 3
+            eq5 = (drrs[j] < -1) and (s22[j] > 1)
+
+            if not any([eq3, eq4, eq5]):
+                i += 1
+                continue
+
+            eq6 = abs(rr[j] / 2 - medrr[j]) < th2[j]
+            eq7 = abs(rr[j] + rr[j + 1] - medrr[j]) < th2[j]
+
+            if all([eq5, eq7]):
+                extra_indices.append(j)
+                i += 1
+                continue
+
+            if all([eq3, eq6]):
+                missed_indices.append(j)
+                i += 1
+                continue
+
+            longshort_indices.append(j)
+            i += 1
+
+    artifacts = {
+        'ectopic': ectopic_indices, 
+        'missed': missed_indices, 
+        'extra': extra_indices, 
+        'longshort': longshort_indices
+    }
+    subspaces = {
+        'rr': rr,
+        'drrs': drrs,
+        'mrrs': mrrs,
+        's12': s12, 
+        's22': s22, 
+        'c1': c1, 
+        'c2': c2
+    }
+
+    return artifacts, subspaces
+
+def estimate_th(x, alpha, ww):
+    '''estimate_th: estimate threshold
+
+    Parameters
+    ----------
+        x: array
+            Vector containing drrs or mrrs.
+        alpha : float
+            Empirically obtaind constant used in threshold calculation.
+        ww: int
+            Window width in ms.
+
+    Returns
+    -------
+        th: float
+            Threshold.
+    '''
+    df = pd.DataFrame({"signal": np.abs(x)})
+    q1 = (
+        df.rolling(ww, center=True, min_periods=1)
+        .quantile(0.25)
+        .signal.values
+    )
+    q3 = (
+        df.rolling(ww, center=True, min_periods=1)
+        .quantile(0.75)
+        .signal.values
+    )
+    th = alpha * ((q3 - q1) / 2)
+    return th
+
+def correct_extra(extra_indices, peaks):
+    '''correct_extra: correct extra beat by deleting it.
+
+    Parameters
+    ----------
+        extra_indices: array
+            Vector containing indices of extra beats.
+        peaks : array
+            Vector containing indices of detected peaks (R waves locations).
+
+    Returns
+    -------
+        corrected_peaks: array
+            Vector containing indices of corrected peaks.
+    '''
+    corrected_peaks = peaks.copy()
+    corrected_peaks = np.delete(corrected_peaks, extra_indices)
+    return corrected_peaks
+
+def correct_misaligned(misaligned_indices, peaks):
+    '''correct_misaligned: correct misaligned beat (long or short) by interpolating new values to the RR time series.
+
+    Parameters
+    ----------
+        misaligned_indices: array
+            Vector containing indices of misaligned beats.
+        peaks : array
+            Vector containing indices of detected peaks (R waves locations).
+
+    Returns
+    -------
+        corrected_peaks: array
+            Vector containing indices of corrected peaks.
+    '''
+    corrected_peaks = np.array(peaks.copy())
+
+    misaligned_indices = np.array(misaligned_indices)
+    valid_indices = np.logical_and(
+        misaligned_indices > 1, 
+        misaligned_indices < len(corrected_peaks) - 1
+    )
+    misaligned_indices = misaligned_indices[valid_indices]
+    prev_peaks = corrected_peaks[misaligned_indices - 1]
+    next_peaks = corrected_peaks[misaligned_indices + 1]
+
+    half_ibi = (next_peaks - prev_peaks) / 2
+    peaks_interp = prev_peaks + half_ibi
+
+    corrected_peaks = np.delete(corrected_peaks, misaligned_indices)
+    corrected_peaks = np.round(np.sort(np.concatenate((corrected_peaks, peaks_interp))))
+
+    return corrected_peaks
+
+def correct_missed(missed_indices, peaks):
+    '''correct_missed: correct missed beat by adding new R-wave occurrence time so that 
+    it divides the detected long RR interval into two equal halves and RR interval series
+    is then recalculated.
+
+    Parameters
+    ----------
+        missed_indices: array
+            Vector containing indices of missed beats.
+        peaks : array
+            Vector containing indices of detected peaks (R waves locations).
+
+    Returns
+    -------
+        corrected_peaks: array
+            Vector containing indices of corrected peaks.
+    '''
+    corrected_peaks = peaks.copy()
+    missed_indices = np.array(missed_indices)
+    valid_indices = np.logical_and(
+        missed_indices > 1, missed_indices < len(corrected_peaks)
+    ) 
+    missed_indices = missed_indices[valid_indices]
+    prev_peaks = corrected_peaks[[i - 1 for i in missed_indices]]
+    next_peaks = corrected_peaks[missed_indices]
+    added_peaks = [round(prev_peaks[i] + (next_peaks[i] - prev_peaks[i]) / 2) for i in range(len(valid_indices))]
+
+    corrected_peaks = np.insert(corrected_peaks, missed_indices, added_peaks)
+
+
+    return corrected_peaks
+
+def update_indices(source_indices, update_indices, update):
+    '''update_indices: updates the indices in update_indices based on the values in source_indices and update.
+
+    Parameters
+    ----------
+        source_indices: array
+            Vector containing original indices.
+        update_indices : array
+            Vector containing update_indices.
+        update: int
+            Update index 
+
+    Returns
+    -------
+        list(np.unique(update_indices)): array
+            Vector containing unique updated indices.
+    '''
+    if not update_indices:
+        return update_indices
+    for s in source_indices:
+        update_indices = [u + update if u > s else u for u in update_indices]
+    return list(np.unique(update_indices))
+
+def correct_artifacts(artifacts, peaks):
+    '''correct_artifacts: correct artifacts according to its type.
+
+    Parameters
+    ----------
+        artifacts: dictionary
+            Struct containing indices of detected artifacts.
+        peaks: array
+            Vector containing indices of detected peaks (R waves locations) 
+
+    Returns
+    -------
+        peaks: array
+            Vector containing indices of corrected R peaks.
+    '''
+    extra_indices = artifacts['extra']
+    missed_indices = artifacts['missed']
+    ectopic_indices = artifacts['ectopic']
+    longshort_indices = artifacts['longshort']
+
+    if extra_indices:
+        peaks = correct_extra(extra_indices, peaks)
+        missed_indices = update_indices(extra_indices, missed_indices, -1)
+        ectopic_indices = update_indices(extra_indices, ectopic_indices, -1)
+        longshort_indices = update_indices(extra_indices, longshort_indices, -1)
+
+    if missed_indices:
+        peaks = correct_missed(missed_indices, peaks)
+        ectopic_indices = update_indices(missed_indices, ectopic_indices, 1)
+        longshort_indices = update_indices(missed_indices, longshort_indices, 1)
+
+    if ectopic_indices:
+        peaks = correct_misaligned(ectopic_indices, peaks)
+
+    if longshort_indices:
+        peaks = correct_misaligned(longshort_indices, peaks)
+
+    return peaks
+
+def plot_artifacts(artifacts, subspaces):
+    '''plot_artifacts: plot artifacts according to its type.
+
+    Parameters
+    ----------
+        artifacts: dictionary
+            Struct containing indices of detected artifacts.
+        subspaces: dictionary
+            Subspaces containing rr, drrs, mrrs, s12, s22, c1, c2 used to classify artifacts.
+
+    Returns
+    -------
+        None
+    '''
+    ectopic_indices = artifacts['ectopic']
+    missed_indices = artifacts['missed']
+    extra_indices = artifacts['extra']
+    longshort_indices = artifacts['longshort']
+
+    rr = subspaces['rr']
+    drrs = subspaces['drrs']
+    mrrs = subspaces['mrrs']
+    s12 = subspaces['s12']
+    s22 = subspaces['s22']
+    c1 = subspaces['c1']
+    c2 = subspaces['c2']
+
+    fig, axs = plt.subplots(3, 2, figsize=(10, 15))
+
+    # Artifact types
+    axs[0, 0].plot(rr, 'k')
+    axs[0, 0].scatter(longshort_indices, rr[longshort_indices], 15, 'c')
+    axs[0, 0].scatter(ectopic_indices, rr[ectopic_indices], 15, 'r')
+    axs[0, 0].scatter(extra_indices, rr[extra_indices], 15, 'm')
+    axs[0, 0].scatter(missed_indices, rr[missed_indices], 15, 'g')
+    axs[0, 0].legend(['', 'Long/Short', 'Ectopic', 'False positive', 'False negative'], loc='upper right')
+    axs[0, 0].set_title('Artifact types')
+
+    # Th1
+    axs[1, 0].plot(abs(drrs))
+    axs[1, 0].axhline(y=1, color='r', linestyle='--')
+    axs[1, 0].set_title('Consecutive-difference criterion')
+
+    # Th2
+    axs[1, 1].plot(abs(mrrs))
+    axs[1, 1].axhline(y=3, color='r', linestyle='--')
+    axs[1, 1].set_title('Difference-from-median criterion')
+
+    # Subspace S12
+    axs[2, 0].scatter(drrs, s12, 15, 'k')
+    axs[2, 0].scatter(drrs[longshort_indices], s12[longshort_indices], 15, 'c')
+    axs[2, 0].scatter(drrs[ectopic_indices], s12[ectopic_indices], 15, 'r')
+    axs[2, 0].scatter(drrs[extra_indices], s12[extra_indices], 15, 'm')
+    axs[2, 0].scatter(drrs[missed_indices], s12[missed_indices], 15, 'g')
+    axs[2, 0].add_patch(patches.Polygon([[-10, 5], [-10, -c1 * -10 + c2], [-1, -c1 * -1 + c2], [-1, 5]], alpha=0.05, color='k'))
+    axs[2, 0].add_patch(patches.Polygon([[1, -c1 * 1 - c2], [1, -5], [10, -5], [10, -c1 * 10 - c2]], alpha=0.05, color='k'))
+    axs[2, 0].set_title('Subspace S12')
+
+    # Subspace S21
+    axs[2, 1].scatter(drrs, s22, 15, 'k')
+    axs[2, 1].scatter(drrs[longshort_indices], s22[longshort_indices], 15, 'c')
+    axs[2, 1].scatter(drrs[ectopic_indices], s22[ectopic_indices], 15, 'r')
+    axs[2, 1].scatter(drrs[extra_indices], s22[extra_indices], 15, 'm')
+    axs[2, 1].scatter(drrs[missed_indices], s22[missed_indices], 15, 'g')
+    axs[2, 1].add_patch(patches.Polygon([[-10, 10], [-10, 1], [-1, 1], [-1, 10]], alpha=0.05, color='k'))
+    axs[2, 1].add_patch(patches.Polygon([[1, -1], [1, -10], [10, -10], [10, -1]], alpha=0.05, color='k'))
+    axs[2, 1].set_title('Subspace S21')
+
+    plt.tight_layout()
+    plt.show()
+
+# função principal
+def fixpeaks(peaks, sampling_rate=1000, iterative=True, show=False):
+    '''FIXPEAKS: HRV time series artifact correction.
+
+    Follows the approach by Lipponen et. al, 2019 [Lipp19].
+    Matlab implementation by Marek Sokol, 2022.
+
+    Parameters
+    ----------
+        peaks: array
+            Vector containing indices of detected peaks (R waves locations)
+        sampling_rate : int, float, optional
+            ECG sampling frequency, in Hz.
+        iterative: boolean, optional
+            Repeatedly apply the artifact correction (default = true).
+        show: boolean, optional
+            Visualize artifacts and artifact thresholds (default = false).
+
+    Returns
+    -------
+        artifacts: dictionary
+            Struct containing indices of detected artifacts.
+        peaks_clean: array
+            Vector of corrected peak values (indices)
+    
+    References
+    ----------
+    .. [Lipp19] Jukka A. Lipponen & Mika P. Tarvainen (2019): A robust algorithm for heart rate variability 
+       time series artefact correction using novel beat classification, Journal of Medical Engineering & Technology
+    '''
+
+    # check inputs
+    if peaks is None:
+        raise TypeError("Please specify an input R peaks array.")
+
+    artifacts, subspaces = find_artifacts(peaks, sampling_rate)
+    peaks_clean = correct_artifacts(artifacts, peaks)
+
+    if iterative:
+        n_artifacts_current = sum([len(v) for v in artifacts.values()])
+
+        while True:
+            new_artifacts, new_subspaces = find_artifacts(peaks_clean, sampling_rate)
+            n_artifacts_previous = n_artifacts_current
+            n_artifacts_current = sum([len(v) for v in new_artifacts.values()])
+
+            if n_artifacts_current >= n_artifacts_previous:
+                break
+
+            artifacts = new_artifacts
+            subspaces = new_subspaces
+            peaks_clean = correct_artifacts(artifacts, peaks_clean)
+
+    if show:
+        plot_artifacts(artifacts, subspaces)
+    
+    return utils.ReturnTuple((artifacts, peaks_clean), ("artifacts", "peaks_clean"))
