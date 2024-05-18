@@ -1389,7 +1389,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
     Parameters
     ----------
     
-    ecg : array
+    signal : array
         Input raw ECG signal.
     fs: int, float, optional
         Sampling frequency (Hz).
