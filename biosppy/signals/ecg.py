@@ -1384,7 +1384,7 @@ def ASI_segmenter(signal=None, sampling_rate=1000.0, Pth=5.0):
 def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
     """ ECG QRS-Peak Detection Algorithm 
 
-    Follows the approach by Md Niaz and Naimul [MdNiNai22]
+    Follows the approach by Md Niaz and Naimul [MdNiNai22]_.
 
     Parameters
     ----------
