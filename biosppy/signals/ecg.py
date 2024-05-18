@@ -1457,7 +1457,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
     else:
         b = [i*fs/8 for i in vector]      
 
-    ecg_d = signal.filtfilt(b, 1, ecg_h, padlen=3*(max(len(a), len(b)) - 1))
+    ecg_d = ss.filtfilt(b, 1, ecg_h, padlen=3*(max(len(a), len(b)) - 1))
 
     ecg_d = ecg_d/np.max(ecg_d)
 
