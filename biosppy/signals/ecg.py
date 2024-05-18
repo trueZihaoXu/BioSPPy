@@ -1430,7 +1430,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
         a, b = ss.butter(N, Wn, btype='lowpass')
         ecg_l = ss.filtfilt(a, b, ecg)
         
-        ecg_l = ecg_l/np.max(np.abs(ecg_l)) #Normalize by dividing high value. That reduce time of calculation
+        ecg_l = ecg_l/np.max(np.abs(ecg_l)) #Normalize by dividing high value. This reduces time of calculation
 
         Wn = 5*2/fs
         N = 3                                           # Order of 3 less processing
