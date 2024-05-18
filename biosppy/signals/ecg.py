@@ -1466,7 +1466,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
 
     ecg_s = ecg_d**2
     
-    #Smooting
+    #Smoothing
     sm_size = int(0.06 * fs)       
     ecg_s = st.smoother(signal=ecg_s, kernel='flattop', size=sm_size, mirror=True)
 
