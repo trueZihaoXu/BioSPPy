@@ -1436,7 +1436,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
         N = 3                                           # Order of 3 less processing
         a, b = signal.butter(N, Wn, btype='highpass')             # Bandpass filtering
         ecg_h = signal.filtfilt(a, b, ecg_l, padlen=3*(max(len(a), len(b))-1))
-        ecg_h = ecg_h/np.max(np.abs(ecg_h))  #Normalize by dividing high value. That reduce time of calculation
+        ecg_h = ecg_h/np.max(np.abs(ecg_h))  #Normalize by dividing high value. This reduces time of calculation
 
     else:
         ''' Band Pass Filter for noise cancelation of other sampling frequencies (Filtering)'''
