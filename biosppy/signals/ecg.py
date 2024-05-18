@@ -1452,7 +1452,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
     vector = [1, 2, 0, -2, -1]
     if fs != 200:
         int_c = 160/fs
-        b = interp1d(range(1, 6), [i*fs/8 for i in vector])(np.arange(1, 5.1, int_c))  
+        b = interp.interp1d(range(1, 6), [i*fs/8 for i in vector])(np.arange(1, 5.1, int_c))  
                                                                                     
     else:
         b = [i*fs/8 for i in vector]      
