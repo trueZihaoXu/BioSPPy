@@ -1444,7 +1444,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
         f2 = 18 #25  #15                                         # cutoff frequency to discard high frequency noise
         Wn = [f1*2/fs, f2*2/fs]                         # cutoff based on fs
         N = 3                                           
-        a, b = signal.butter(N=N, Wn=Wn, btype='bandpass')   # Bandpass filtering
+        a, b = ss.butter(N=N, Wn=Wn, btype='bandpass')   # Bandpass filtering
         ecg_h = signal.filtfilt(a, b, ecg, padlen=3*(max(len(a), len(b)) - 1))
                     
         ecg_h = ecg_h/np.max(np.abs(ecg_h))
