@@ -1847,7 +1847,7 @@ def find_artifacts(peaks, sampling_rate):
         elif drrs_pad[d] < 0:
             s22[d - padding] = max([drrs_pad[d + 1], drrs_pad[d + 2]])
 
-    medrr = medfilt(rr, medfilt_order)
+    medrr = ss.medfilt(rr, medfilt_order)
     mrrs = rr - medrr
     mrrs[mrrs < 0] *= 2
     th2 = estimate_th(mrrs, alpha, ww) 
