@@ -1468,7 +1468,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
     
     #Smooting
     sm_size = int(0.06 * fs)       
-    ecg_s = smoother(signal=ecg_s, kernel='flattop', size=sm_size, mirror=True)
+    ecg_s = st.smoother(signal=ecg_s, kernel='flattop', size=sm_size, mirror=True)
 
 
     temp_vector = np.ones((1, round(0.150*fs)))/round(0.150*fs) # 150ms moving window, widest possible QRS width
