@@ -1422,7 +1422,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
 
     if fs == 200:
         ''' Remove the mean of Signal '''
-        #If fs=200 keep frwquency 5-12 Hz otherwise 5-18 Hz
+        #If fs=200 keep frequency 5-12 Hz otherwise 5-18 Hz
         ecg = ecg - np.mean(ecg)  
 
         Wn = 12*2/fs
