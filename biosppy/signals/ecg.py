@@ -21,7 +21,10 @@ import math
 import numpy as np
 import scipy.signal as ss
 import matplotlib.pyplot as plt
-from scipy import stats, integrate
+from scipy import stats, integrate, interpolate
+import peakutils
+from scipy.ndimage import filters
+
 
 # local
 from . import tools as st
@@ -1407,7 +1410,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
     """
 
     # check inputs
-    if ecg is None:
+    if signal is None:
         raise TypeError("Please specify an input signal.")
         
     ''' Initialize '''
@@ -1420,15 +1423,15 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
 
     ''' Noise Cancelation (Filtering) (5-18 Hz) '''
 
-    if fs == 200:
+    if sampling_rate == 200:
         ''' Remove the mean of Signal '''
         #If fs=200 keep frequency 5-12 Hz otherwise 5-18 Hz
-        ecg = ecg - np.mean(ecg)  
+        signal = signal - np.mean(signal)  
 
         Wn = 12*2/fs
         N = 3
         a, b = ss.butter(N, Wn, btype='lowpass')
-        ecg_l = ss.filtfilt(a, b, ecg)
+        ecg_l = ss.filtfilt(a, b, signal)
         
         ecg_l = ecg_l/np.max(np.abs(ecg_l)) #Normalize by dividing high value. This reduces time of calculation
 
@@ -1442,20 +1445,20 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
         ''' Band Pass Filter for noise cancelation of other sampling frequencies (Filtering)'''
         f1 = 5 #3 #5                                          # cutoff low frequency to get rid of baseline wander
         f2 = 18 #25  #15                                         # cutoff frequency to discard high frequency noise
-        Wn = [f1*2/fs, f2*2/fs]                         # cutoff based on fs
+        Wn = [f1*2/sampling_rate, f2*2/sampling_rate]                         # cutoff based on fs
         N = 3                                           
         a, b = ss.butter(N=N, Wn=Wn, btype='bandpass')   # Bandpass filtering
-        ecg_h = ss.filtfilt(a, b, ecg, padlen=3*(max(len(a), len(b)) - 1))
+        ecg_h = ss.filtfilt(a, b, signal, padlen=3*(max(len(a), len(b)) - 1))
                     
         ecg_h = ecg_h/np.max(np.abs(ecg_h))
 
     vector = [1, 2, 0, -2, -1]
-    if fs != 200:
-        int_c = 160/fs
-        b = interp.interp1d(range(1, 6), [i*fs/8 for i in vector])(np.arange(1, 5.1, int_c))  
+    if sampling_rate != 200:
+        int_c = 160/sampling_rate
+        b = interpolate.interp1d(range(1, 6), [i*sampling_rate/8 for i in vector])(np.arange(1, 5.1, int_c))  
                                                                                     
     else:
-        b = [i*fs/8 for i in vector]      
+        b = [i*sampling_rate/8 for i in vector]      
 
     ecg_d = ss.filtfilt(b, 1, ecg_h, padlen=3*(max(len(a), len(b)) - 1))
 
@@ -1467,19 +1470,19 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
     ecg_s = ecg_d**2
     
     #Smoothing
-    sm_size = int(0.06 * fs)       
+    sm_size = int(0.06 * sampling_rate)       
     ecg_s = st.smoother(signal=ecg_s, kernel='flattop', size=sm_size, mirror=True)
 
 
-    temp_vector = np.ones((1, round(0.150*fs)))/round(0.150*fs) # 150ms moving window, widest possible QRS width
+    temp_vector = np.ones((1, round(0.150*sampling_rate)))/round(0.150*sampling_rate) # 150ms moving window, widest possible QRS width
     temp_vector = temp_vector.flatten()
-    ecg_m = np.convolve(ecg_s, temp_vector)  #Convolution signal and moving window sample
+    ecg_m = np.convolve(ecg_s["signal"], temp_vector)  #Convolution signal and moving window sample
 
-    delay = delay + round(0.150*fs)/2
+    delay = delay + round(0.150*sampling_rate)/2
 
 
     pks = []
-    locs = peakutils.indexes(y=ecg_m, thres=0, min_dist=round(0.231*fs))  #Find all the peaks apart from previous peak 231ms, peak indices
+    locs = peakutils.indexes(y=ecg_m, thres=0, min_dist=round(0.231*sampling_rate))  #Find all the peaks apart from previous peak 231ms, peak indices
     for val in locs:
         pks.append(ecg_m[val])     #Peak magnitudes
 
@@ -1506,16 +1509,16 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
 
     ''' Initialize the training phase (2 seconds of the signal) to determine the THR_SIG and THR_NOISE '''
     #Threshold of signal after moving average operation; Take first 2s window max peak to set initial Threshold
-    THR_SIG = np.max(ecg_m[:2*fs+1])*1/3                 # Threshold-1 (paper) #0.33 of the max amplitude 
-    THR_NOISE = np.mean(ecg_m[:2*fs+1])*1/2              #Threshold-2 (paper) # 0.5 of the mean signal is considered to be noise
+    THR_SIG = np.max(ecg_m[:2*int(sampling_rate)+1])*1/3                 # Threshold-1 (paper) #0.33 of the max amplitude 
+    THR_NOISE = np.mean(ecg_m[:2*int(sampling_rate)+1])*1/2              #Threshold-2 (paper) # 0.5 of the mean signal is considered to be noise
     SIG_LEV = THR_SIG                         #SPK for convoluted (after moving window) signal
     NOISE_LEV = THR_NOISE                     #NPK for convoluted (after moving window) signal
 
 
     ''' Initialize bandpath filter threshold (2 seconds of the bandpass signal) '''
     #Threshold of signal before derivative and moving average operation, just after 5-18 Hz filtering
-    THR_SIG1 = np.max(ecg_h[:2*fs+1])*1/3               #Threshold-1
-    THR_NOISE1 = np.mean(ecg_h[:2*fs+1])*1/2            #Threshold-2
+    THR_SIG1 = np.max(ecg_h[:2*int(sampling_rate)+1])*1/3               #Threshold-1
+    THR_NOISE1 = np.mean(ecg_h[:2*int(sampling_rate)+1])*1/2            #Threshold-2
     SIG_LEV1 = THR_SIG1                                 # Signal level in Bandpassed filter; SPK for filtered signal
     NOISE_LEV1 = THR_NOISE1                             # Noise level in Bandpassed filter; NPK for filtered signal
 
@@ -1530,8 +1533,8 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
     for i in range(LLp):
         ''' Locate the corresponding peak in the filtered signal '''
 
-        if locs[i] - round(0.150*fs) >= 1 and locs[i] <= len(ecg_h): 
-            temp_vec = ecg_h[locs[i] - round(0.150*fs):locs[i]+1]     # Find the values from the preceding 150ms of the peak
+        if locs[i] - round(0.150*sampling_rate) >= 1 and locs[i] <= len(ecg_h): 
+            temp_vec = ecg_h[locs[i] - round(0.150*sampling_rate):locs[i]+1]     # Find the values from the preceding 150ms of the peak
             y_i = np.max(temp_vec)                      #Find the max magnitude in that 150ms window
             x_i = list(temp_vec).index(y_i)             #Find the index of the max value with respect to (peak-150ms) starts as 0 index
         else:
@@ -1541,7 +1544,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
                 x_i = list(temp_vec).index(y_i)
                 ser_back = 1
             elif locs[i] >= len(ecg_h):
-                temp_vec = ecg_h[int(locs[i] - round(0.150*fs)):] #c
+                temp_vec = ecg_h[int(locs[i] - round(0.150*sampling_rate)):] #c
                 y_i = np.max(temp_vec)
                 x_i = list(temp_vec).index(y_i)
 
@@ -1563,13 +1566,13 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
             test_m = 0
 
         #If no R peaks in 1.4s then check with the reduced Threshold    
-        if (locs[i] - qrs_i[Beat_C-1]) >= round(1.4*fs):     
+        if (locs[i] - qrs_i[Beat_C-1]) >= round(1.4*sampling_rate):     
                 
-                temp_vec = ecg_m[int(qrs_i[Beat_C-1] + round(0.360*fs)):int(locs[i])+1] #Search after 360ms of previous QRS to current peak
+                temp_vec = ecg_m[int(qrs_i[Beat_C-1] + round(0.360*sampling_rate)):int(locs[i])+1] #Search after 360ms of previous QRS to current peak
                 if temp_vec.size:
                     pks_temp = np.max(temp_vec) #search back and locate the max in the interval
                     locs_temp = list(temp_vec).index(pks_temp)
-                    locs_temp = qrs_i[Beat_C-1] + round(0.360*fs) + locs_temp
+                    locs_temp = qrs_i[Beat_C-1] + round(0.360*sampling_rate) + locs_temp
                     
 
                     if pks_temp > THR_NOISE*0.2:  #Check with 20% of the noise threshold
@@ -1585,11 +1588,11 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
                     #Once we find the peak in convoluted signal, we will search in the filtered signal for max peak with a 150 ms window before that location
                         if locs_temp <= len(ecg_h):
                             
-                            temp_vec = ecg_h[int(locs_temp-round(0.150*fs))+1:int(locs_temp)+2]  
+                            temp_vec = ecg_h[int(locs_temp-round(0.150*sampling_rate))+1:int(locs_temp)+2]  
                             y_i_t = np.max(temp_vec)
                             x_i_t = list(temp_vec).index(y_i_t)
                         else:
-                            temp_vec = ecg_h[int(locs_temp-round(0.150*fs)):]
+                            temp_vec = ecg_h[int(locs_temp-round(0.150*sampling_rate)):]
                             y_i_t = np.max(temp_vec)
                             x_i_t = list(temp_vec).index(y_i_t)
             
@@ -1598,7 +1601,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
                             Beat_C1 = Beat_C1 + 1
                             if (Beat_C1-1)>=LLp:
                                 break
-                            temp_value = locs_temp - round(0.150*fs) + x_i_t
+                            temp_value = locs_temp - round(0.150*sampling_rate) + x_i_t
                             qrs_i_raw[Beat_C1-1] = temp_value                           
                             qrs_amp_raw[Beat_C1-1] = y_i_t                                 
                             
@@ -1616,19 +1619,19 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
                             #the current average RR interval or 1s after the last detected QRS. the maximal peak detected in
                             #that time interval that lies Threshold1 and Threshold-3 (paper) is considered to be a possible QRS complex
 
-            if ((locs[i] - qrs_i[Beat_C-1]) >= round(1.66*test_m)) or ((locs[i] - qrs_i[Beat_C-1]) > round(1*fs)):     #it shows a QRS is missed
+            if ((locs[i] - qrs_i[Beat_C-1]) >= round(1.66*test_m)) or ((locs[i] - qrs_i[Beat_C-1]) > round(1*sampling_rate)):     #it shows a QRS is missed
                                     
-                temp_vec = ecg_m[int(qrs_i[Beat_C-1] + round(0.360*fs)):int(locs[i])+1] #Search after 360ms of previous QRS to current peak
+                temp_vec = ecg_m[int(qrs_i[Beat_C-1] + round(0.360*sampling_rate)):int(locs[i])+1] #Search after 360ms of previous QRS to current peak
                 if temp_vec.size:
                     pks_temp = np.max(temp_vec) #search back and locate the max in the interval
                     locs_temp = list(temp_vec).index(pks_temp)
-                    locs_temp = qrs_i[Beat_C-1] + round(0.360*fs) + locs_temp
+                    locs_temp = qrs_i[Beat_C-1] + round(0.360*sampling_rate) + locs_temp
                     
                     #Consider signal between the preceding 3 QRS complexes and the following 3 peaks to calculate Threshold-3 (paper)
                     
                     THR_NOISE_TMP=THR_NOISE
                     if i<(len(locs)-3):
-                        temp_vec_tmp=ecg_m[int(qrs_i[Beat_C-3] + round(0.360*fs)):int(locs[i+3])+1] #values between the preceding 3 QRS complexes and the following 3 peaks
+                        temp_vec_tmp=ecg_m[int(qrs_i[Beat_C-3] + round(0.360*sampling_rate)):int(locs[i+3])+1] #values between the preceding 3 QRS complexes and the following 3 peaks
                         THR_NOISE_TMP =0.5*THR_NOISE+0.5*( np.mean(temp_vec_tmp)*1/2) #Calculate Threshold3 
                     
                     if pks_temp > THR_NOISE_TMP:  #If max peak in that range greater than Threshold3 mark that as a heart beat
@@ -1644,11 +1647,11 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
                         #Once we find the peak in convoluted signal, we will search in the filtered signal for max peak with a 150 ms window before that location
                         if locs_temp <= len(ecg_h):
                         
-                            temp_vec = ecg_h[int(locs_temp-round(0.150*fs))+1:int(locs_temp)+2]  
+                            temp_vec = ecg_h[int(locs_temp-round(0.150*sampling_rate))+1:int(locs_temp)+2]  
                             y_i_t = np.max(temp_vec)
                             x_i_t = list(temp_vec).index(y_i_t)
                         else:
-                            temp_vec = ecg_h[int(locs_temp-round(0.150*fs)):]
+                            temp_vec = ecg_h[int(locs_temp-round(0.150*sampling_rate)):]
                             y_i_t = np.max(temp_vec)
                             x_i_t = list(temp_vec).index(y_i_t)
                         
@@ -1656,13 +1659,13 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
                         ''' Band Pass Signal Threshold '''
                         THR_NOISE1_TMP=THR_NOISE1
                         if i<(len(locs)-3):
-                            temp_vec_tmp=ecg_h[int(qrs_i[Beat_C-3] + round(0.360*fs)-round(0.150*fs)+1):int(locs[i+3])+1]
+                            temp_vec_tmp=ecg_h[int(qrs_i[Beat_C-3] + round(0.360*sampling_rate)-round(0.150*sampling_rate)+1):int(locs[i+3])+1]
                             THR_NOISE1_TMP =0.5*THR_NOISE1+0.5*( np.mean(temp_vec_tmp)*1/2)
                         if y_i_t > THR_NOISE1_TMP:
                             Beat_C1 = Beat_C1 + 1
                             if (Beat_C1-1)>=LLp:
                                 break
-                            temp_value = locs_temp - round(0.150*fs) + x_i_t
+                            temp_value = locs_temp - round(0.150*sampling_rate) + x_i_t
                             qrs_i_raw[Beat_C1-1] = temp_value                           # R peak marked with index in filtered signal
                             qrs_amp_raw[Beat_C1-1] = y_i_t                                 # Amplitude of that R peak
                             
@@ -1690,11 +1693,11 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
                     if (locs[i] - qrs_i[Beat_C-1]) <= round(0.5*test_m): #Check 50 percent of the current average RR interval
                             
                         Check_Flag=1
-                if (locs[i] - qrs_i[Beat_C-1] <= round(0.36*fs)) or Check_Flag==1:  
+                if (locs[i] - qrs_i[Beat_C-1] <= round(0.36*sampling_rate)) or Check_Flag==1:  
                     
-                    temp_vec = ecg_m[locs[i]-round(0.07*fs):locs[i]+1]
+                    temp_vec = ecg_m[locs[i]-round(0.07*sampling_rate):locs[i]+1]
                     Slope1 = np.mean(np.diff(temp_vec))          # mean slope of the waveform at that position
-                    temp_vec = ecg_m[int(qrs_i[Beat_C-1] - round(0.07*fs)) - 1 : int(qrs_i[Beat_C-1])+1]
+                    temp_vec = ecg_m[int(qrs_i[Beat_C-1] - round(0.07*sampling_rate)) - 1 : int(qrs_i[Beat_C-1])+1]
                     Slope2 = np.mean(np.diff(temp_vec))        # mean slope of previous R wave
 
                     if np.abs(Slope1) <= np.abs(0.6*Slope2):          # slope less then 0.6 of previous R; checking if it is noise
@@ -1725,7 +1728,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
                         temp_value = x_i + 1
                         qrs_i_raw[Beat_C1-1] = temp_value
                     else:
-                        temp_value = locs[i] - round(0.150*fs) + x_i
+                        temp_value = locs[i] - round(0.150*sampling_rate) + x_i
                         qrs_i_raw[Beat_C1-1] = temp_value
 
                     qrs_amp_raw[Beat_C1-1] = y_i
@@ -1790,7 +1793,7 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
     qrs_c = qrs_c[:Beat_C+1]
     qrs_i = qrs_i[:Beat_C+1]
     
-    return utils.ReturnTuple((qrs_i_raw,), ("rpeaks",))
+    return utils.ReturnTuple((qrs_i_raw.astype(int),), ("rpeaks",))
 
 
 def find_artifacts(peaks, sampling_rate):
@@ -1942,18 +1945,14 @@ def estimate_th(x, alpha, ww):
         th: float
             Threshold.
     '''
-    df = pd.DataFrame({"signal": np.abs(x)})
-    q1 = (
-        df.rolling(ww, center=True, min_periods=1)
-        .quantile(0.25)
-        .signal.values
-    )
-    q3 = (
-        df.rolling(ww, center=True, min_periods=1)
-        .quantile(0.75)
-        .signal.values
-    )
+
+    x_abs = np.abs(x)
+
+    q1 = filters.percentile_filter(x_abs, 25, size=ww, mode='reflect')
+    q3 = filters.percentile_filter(x_abs, 75, size=ww, mode='reflect')
+
     th = alpha * ((q3 - q1) / 2)
+
     return th
 
 def correct_extra(extra_indices, peaks):
