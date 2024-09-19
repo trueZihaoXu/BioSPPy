@@ -1428,14 +1428,14 @@ def Pan_Tompkins_Plus_Plus_segmenter(signal=None, sampling_rate=1000.0):
         #If fs=200 keep frequency 5-12 Hz otherwise 5-18 Hz
         signal = signal - np.mean(signal)  
 
-        Wn = 12*2/fs
+        Wn = 12*2/sampling_rate
         N = 3
         a, b = ss.butter(N, Wn, btype='lowpass')
         ecg_l = ss.filtfilt(a, b, signal)
         
         ecg_l = ecg_l/np.max(np.abs(ecg_l)) #Normalize by dividing high value. This reduces time of calculation
 
-        Wn = 5*2/fs
+        Wn = 5*2/sampling_rate
         N = 3                                           # Order of 3 less processing
         a, b = signal.butter(N, Wn, btype='highpass')             # Bandpass filtering
         ecg_h = signal.filtfilt(a, b, ecg_l, padlen=3*(max(len(a), len(b))-1))
